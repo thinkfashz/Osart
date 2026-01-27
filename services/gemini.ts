@@ -1,12 +1,13 @@
-
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 export async function askGeminiExpert(prompt: string, context: string = "") {
+  // Fixed: Initialize GoogleGenAI inside the function to ensure the most current API key is used
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      // Fixed: Switched to gemini-3-pro-preview for complex technical and engineering reasoning tasks
+      model: 'gemini-3-pro-preview',
       contents: `Consulta del cliente Osart: ${prompt}`,
       config: {
         systemInstruction: `Eres el System Pilot de Osart Elite.
@@ -20,11 +21,12 @@ export async function askGeminiExpert(prompt: string, context: string = "") {
       5. Si no sabes algo, remite al manual técnico del fabricante.
       
       FORMATO: Usa Markdown para mejorar la legibilidad.`,
-        temperature: 0.5, // Menor temperatura para mayor determinismo técnico.
+        temperature: 0.5, // Lower temperature for technical determinism.
         topP: 0.9,
       }
     });
     
+    // Correctly using the .text property as defined in the latest SDK
     return response.text || "Protocolo de comunicación fallido. Reiniciando enlace...";
   } catch (error) {
     console.error("Agent Error:", error);
