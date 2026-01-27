@@ -3,5 +3,9 @@
   "description": "A high-performance e-commerce platform for electronic components, featuring an integrated AI assistant, educational games, and a full checkout system.",
   "requestFramePermissions": [
     "camera"
-  ]
+  ],
+  "deployment": {
+    "provider": "vercel",
+    "preset": "static"
+  }
 }
