@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Search, ShoppingCart, Cpu, User, Menu, X, 
-  Home, Gamepad2, Package, LogOut, ChevronRight, CheckCircle, AlertTriangle
+  Home, Gamepad2, Package, LogOut, ChevronRight, CheckCircle, AlertTriangle, Truck, Bell
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppView, Product, CartItem, User as UserType, Category } from './types';
@@ -28,7 +28,7 @@ const App: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<Category>('Todos');
   const [lowStockAlerts, setLowStockAlerts] = useState<string[]>([]);
 
-  // Persistence logic compatible with Supabase (mocked)
+  // Persistent Hydration
   useEffect(() => {
     const savedCart = localStorage.getItem('osart_cart');
     if (savedCart) setCart(JSON.parse(savedCart));
@@ -36,15 +36,16 @@ const App: React.FC = () => {
     if (savedUser) setUser(JSON.parse(savedUser));
   }, []);
 
-  // Real-time Stock Monitor (Simulating Supabase Channel)
+  // REAL-TIME STOCK MONITOR
   useEffect(() => {
-    const lowStockItems = cart
-      .filter(item => item.stock < 5)
-      .map(item => item.name);
-    
-    setLowStockAlerts(lowStockItems);
+    const criticalItems = cart.filter(item => item.stock < 5).map(item => item.name);
+    setLowStockAlerts(prev => {
+      const isDifferent = criticalItems.length !== prev.length || criticalItems.some(i => !prev.includes(i));
+      return isDifferent ? criticalItems : prev;
+    });
   }, [cart]);
 
+  // Persistence triggers
   useEffect(() => {
     localStorage.setItem('osart_cart', JSON.stringify(cart));
   }, [cart]);
@@ -84,18 +85,28 @@ const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleLogin = (u: UserType) => {
-    setUser(u);
-    setShowAuthModal(false);
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    setView(AppView.HOME);
+  // Variantes de Animación para Vistas SPA
+  const pageVariants = {
+    initial: { opacity: 0, x: 10, y: 10 },
+    animate: { opacity: 1, x: 0, y: 0 },
+    exit: { opacity: 0, x: -10, y: -10 }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans selection:bg-indigo-100 selection:text-indigo-900 overflow-x-hidden">
+    <div className="min-h-screen bg-[#f5f5f5] flex flex-col font-sans selection:bg-blue-100 selection:text-blue-900 overflow-x-hidden">
+      {/* Barra de envío dinámico */}
+      <motion.div 
+        initial={{ y: -50 }}
+        animate={{ y: 0 }}
+        className="bg-[#fff159] py-2 px-4 text-center text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] hidden md:block border-b border-black/5"
+      >
+        <div className="max-w-7xl mx-auto flex items-center justify-center gap-4">
+          <Truck size={16} className="text-blue-600" /> 
+          Envíos gratis en 24h para compras sobre $49.990
+          <span className="bg-blue-600 text-white px-3 py-0.5 rounded-full text-[9px] animate-pulse">SISTEMA SEGURO</span>
+        </div>
+      </motion.div>
+
       <Navbar 
         view={view} 
         setView={setView} 
@@ -106,30 +117,29 @@ const App: React.FC = () => {
       />
 
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        {/* Real-time Toast Notification Container */}
-        <div className="fixed top-24 right-4 z-[100] flex flex-col gap-3 pointer-events-none">
+        {/* Toast Notification Container */}
+        <div className="fixed top-24 right-6 z-[100] flex flex-col gap-4 pointer-events-none">
           <AnimatePresence>
-            {lowStockAlerts.map((itemName, idx) => (
+            {lowStockAlerts.map((itemName) => (
               <motion.div
                 key={itemName}
-                initial={{ opacity: 0, x: 50, scale: 0.8 }}
+                initial={{ opacity: 0, x: 50, scale: 0.9 }}
                 animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
-                className="bg-white border-l-4 border-red-500 shadow-2xl p-4 rounded-2xl flex items-center gap-4 pointer-events-auto max-w-xs"
+                exit={{ opacity: 0, scale: 0.8, x: 20 }}
+                className="bg-white border-l-8 border-red-600 shadow-2xl p-5 rounded-2xl flex items-center gap-5 pointer-events-auto border border-slate-100 max-w-sm"
               >
-                <div className="bg-red-50 p-2 rounded-xl">
-                  <AlertTriangle className="text-red-500" size={20} />
+                <div className="bg-red-50 p-3 rounded-xl shadow-inner">
+                  <Bell className="text-red-600 animate-ring" size={24} />
                 </div>
-                <div>
-                  <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">Stock Crítico</p>
-                  <p className="text-xs font-bold text-slate-800 line-clamp-1">{itemName}</p>
-                  <p className="text-[9px] text-slate-400">¡Quedan pocas unidades!</p>
+                <div className="flex-1">
+                  <p className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-0.5">Stock Crítico</p>
+                  <p className="text-sm font-black text-slate-800 line-clamp-1">{itemName}</p>
                 </div>
                 <button 
-                  onClick={() => setLowStockAlerts(prev => prev.filter(n => n !== itemName))}
-                  className="ml-auto text-slate-300 hover:text-slate-500"
+                  onClick={() => setLowStockAlerts(prev => prev.filter(n => n !== itemName))} 
+                  className="p-2 hover:bg-slate-50 rounded-xl text-slate-300 hover:text-red-600 transition-all"
                 >
-                  <X size={14} />
+                  <X size={16} />
                 </button>
               </motion.div>
             ))}
@@ -138,28 +148,43 @@ const App: React.FC = () => {
 
         <AnimatePresence mode="wait">
           {view === AppView.HOME && (
-            <motion.div
-              key="home"
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
+            <motion.div 
+              key="home" 
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.4, ease: "easeOut" }}
             >
-              <HeroSection onExplore={() => setView(AppView.CATALOG)} onPlay={() => setView(AppView.GAME)} />
-              <Catalog 
-                products={INITIAL_PRODUCTS} 
-                onProductSelect={handleProductSelect}
-                onAddToCart={addToCart}
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                selectedCategory={selectedCategory}
-                setSelectedCategory={setSelectedCategory}
-              />
+              <HeroSection onExplore={() => setView(AppView.CATALOG)} />
+              <div className="mb-16">
+                 <div className="flex items-center justify-between mb-10">
+                   <h2 className="text-4xl font-black text-slate-900 tracking-tighter flex items-center gap-4">
+                     <Package className="text-blue-600" /> Ingeniería Destacada
+                   </h2>
+                   <button onClick={() => setView(AppView.CATALOG)} className="bg-white px-6 py-3 rounded-2xl border border-slate-200 text-sm font-black text-blue-600 hover:border-blue-500 transition-all uppercase tracking-widest">Ver Catálogo</button>
+                 </div>
+                 <Catalog 
+                  products={INITIAL_PRODUCTS} 
+                  onProductSelect={handleProductSelect}
+                  onAddToCart={addToCart}
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                  selectedCategory={selectedCategory}
+                  setSelectedCategory={setSelectedCategory}
+                />
+              </div>
             </motion.div>
           )}
 
           {view === AppView.CATALOG && (
-            <motion.div key="catalog" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div 
+              key="catalog" 
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
               <Catalog 
                 products={INITIAL_PRODUCTS} 
                 onProductSelect={handleProductSelect}
@@ -173,122 +198,178 @@ const App: React.FC = () => {
           )}
 
           {view === AppView.DETAIL && selectedProduct && (
-            <ProductDetail 
-              product={selectedProduct} 
-              onAddToCart={addToCart} 
-              onBack={() => setView(AppView.CATALOG)} 
-            />
+            <motion.div 
+              key="detail" 
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              <ProductDetail 
+                product={selectedProduct} 
+                onAddToCart={addToCart} 
+                onBack={() => setView(AppView.CATALOG)} 
+              />
+            </motion.div>
           )}
 
           {view === AppView.CART && (
-            <Cart 
-              items={cart} 
-              onUpdateQuantity={updateQuantity} 
-              onRemove={removeFromCart} 
-              onCheckout={() => setView(AppView.CHECKOUT)} 
-              onBack={() => setView(AppView.CATALOG)}
-            />
+            <motion.div 
+              key="cart" 
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              <Cart 
+                items={cart} 
+                onUpdateQuantity={updateQuantity} 
+                onRemove={removeFromCart} 
+                onCheckout={() => setView(AppView.CHECKOUT)} 
+                onBack={() => setView(AppView.CATALOG)}
+              />
+            </motion.div>
           )}
 
           {view === AppView.CHECKOUT && (
-            <Checkout 
-              items={cart} 
-              user={user} 
-              onComplete={() => {
-                setCart([]);
-                setView(AppView.SUCCESS);
-              }}
-              onBack={() => setView(AppView.CART)}
-            />
+            <motion.div 
+              key="checkout" 
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              <Checkout 
+                items={cart} 
+                user={user} 
+                onComplete={() => { setCart([]); setView(AppView.SUCCESS); }}
+                onBack={() => setView(AppView.CART)}
+              />
+            </motion.div>
           )}
 
           {view === AppView.SUCCESS && (
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-8 shadow-xl shadow-green-200/50">
+            <motion.div 
+              key="success" 
+              initial={{ scale: 0.9, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              className="flex flex-col items-center justify-center py-24 bg-white rounded-[4rem] shadow-2xl border border-slate-100 max-w-3xl mx-auto text-center"
+            >
+              <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-10 shadow-xl shadow-green-500/10">
                 <CheckCircle size={48} />
               </div>
-              <h2 className="text-5xl font-black mb-4 tracking-tighter text-slate-900">¡Órden Exitosa!</h2>
-              <p className="text-lg text-slate-500 mb-10 max-w-md mx-auto font-medium">Estamos preparando tus componentes. Recibirás una notificación vía Supabase en tiempo real.</p>
-              <button onClick={() => setView(AppView.HOME)} className="bg-slate-900 text-white px-12 py-5 rounded-[2rem] font-black text-lg hover:scale-105 active:scale-95 transition-all shadow-2xl">Ir a mi Panel de Control</button>
+              <h2 className="text-5xl font-black mb-4 tracking-tighter text-slate-900 leading-none uppercase">¡Órden Recibida!</h2>
+              <p className="text-lg text-slate-500 mb-12 max-w-md mx-auto font-medium leading-relaxed px-6">Tu pedido ha sido procesado exitosamente por nuestra red de logística. Recibirás una notificación en breve.</p>
+              <div className="flex flex-col sm:flex-row gap-5 px-6 w-full max-w-md">
+                <button onClick={() => setView(AppView.HOME)} className="flex-grow bg-[#3483fa] text-white px-10 py-5 rounded-2xl font-black text-lg hover:bg-blue-600 transition-all shadow-xl shadow-blue-500/20 uppercase tracking-widest">Seguir Comprando</button>
+                <button onClick={() => setView(AppView.PROFILE)} className="flex-grow bg-slate-900 text-white px-10 py-5 rounded-2xl font-black text-lg hover:bg-slate-800 transition-all shadow-xl shadow-black/10 uppercase tracking-widest">Mis Órdenes</button>
+              </div>
             </motion.div>
           )}
 
           {view === AppView.GAME && (
-            <ElectroGame 
-              onClose={() => setView(AppView.HOME)} 
-              onAddXP={(xp) => {
-                if(user) {
-                  setUser({ ...user, learningPoints: user.learningPoints + xp });
-                }
-              }}
-            />
+            <motion.div key="game" variants={pageVariants} initial="initial" animate="animate" exit="exit">
+              <ElectroGame onClose={() => setView(AppView.HOME)} onAddXP={(xp) => user && setUser({...user, learningPoints: user.learningPoints + xp})} />
+            </motion.div>
           )}
 
           {view === AppView.PROFILE && user && (
-            <Profile user={user} onLogout={handleLogout} />
+            <motion.div key="profile" variants={pageVariants} initial="initial" animate="animate" exit="exit">
+              <Profile user={user} onLogout={() => { setUser(null); setView(AppView.HOME); }} />
+            </motion.div>
           )}
         </AnimatePresence>
       </main>
 
       <Footer setView={setView} />
       
-      <AIAssistant context={JSON.stringify(INITIAL_PRODUCTS.map(p => ({ n: p.name, c: p.category, p: p.price })))} />
+      <AIAssistant context={JSON.stringify(INITIAL_PRODUCTS.map(p => ({ n: p.name, p: p.price, s: p.stock, c: p.category })))} />
       
       {showAuthModal && (
-        <AuthModal onClose={() => setShowAuthModal(false)} onLogin={handleLogin} />
+        <AuthModal onClose={() => setShowAuthModal(false)} onLogin={(u) => { setUser(u); setShowAuthModal(false); }} />
       )}
+
+      <style>{`
+        @keyframes ring {
+          0% { transform: rotate(0deg); }
+          5% { transform: rotate(15deg); }
+          10% { transform: rotate(-15deg); }
+          15% { transform: rotate(10deg); }
+          20% { transform: rotate(-10deg); }
+          25% { transform: rotate(0deg); }
+          100% { transform: rotate(0deg); }
+        }
+        .animate-ring {
+          animation: ring 2s infinite;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </div>
   );
 };
 
-const HeroSection: React.FC<{ onExplore: () => void, onPlay: () => void }> = ({ onExplore, onPlay }) => (
-  <section className="relative rounded-[3.5rem] overflow-hidden bg-slate-900 text-white mb-20 shadow-2xl border border-white/5 group">
-    <div className="absolute inset-0 bg-gradient-to-r from-indigo-900/95 via-indigo-900/80 to-transparent z-10 transition-opacity group-hover:opacity-90"></div>
+const HeroSection: React.FC<{ onExplore: () => void }> = ({ onExplore }) => (
+  <section className="relative rounded-[4rem] overflow-hidden mb-16 h-[450px] md:h-[600px] shadow-2xl border-4 border-white">
     <motion.img 
       initial={{ scale: 1.1 }}
       animate={{ scale: 1 }}
-      transition={{ duration: 10, repeat: Infinity, repeatType: "reverse" }}
-      src="https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80" 
-      className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-overlay"
-      alt="Hardware Background"
+      transition={{ duration: 15, repeat: Infinity, repeatType: "reverse" }}
+      src="https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80" 
+      className="absolute inset-0 w-full h-full object-cover"
+      alt="Hardware Hero"
     />
-    <div className="relative z-20 p-8 md:p-24 flex flex-col items-start max-w-4xl">
-      <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
-        <span className="bg-indigo-600 text-white text-[10px] font-black uppercase tracking-[0.4em] px-5 py-2 rounded-full mb-8 inline-block shadow-lg">Turbo Engineering 2026</span>
+    <div className="absolute inset-0 bg-gradient-to-r from-blue-950/95 via-blue-950/60 to-transparent"></div>
+    <div className="relative z-10 p-10 md:p-24 flex flex-col justify-center h-full max-w-4xl text-white">
+      <motion.div 
+        initial={{ x: -50, opacity: 0 }} 
+        animate={{ x: 0, opacity: 1 }} 
+        transition={{ delay: 0.2, type: "spring" }}
+        className="mb-8"
+      >
+        <span className="text-[10px] font-black uppercase tracking-[0.5em] bg-red-600 px-8 py-3 rounded-full w-fit shadow-[0_0_30px_rgba(220,38,38,0.4)] border border-red-400/30">
+          Hardware de Precisión 2024
+        </span>
       </motion.div>
-      <motion.h1 initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }} className="text-6xl md:text-8xl font-black leading-[1] mb-10 tracking-tighter">
-        Llevamos tu <br/>
-        <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-cyan-300">Visión al Silicio.</span>
+      <motion.h1 
+        initial={{ y: 30, opacity: 0 }} 
+        animate={{ y: 0, opacity: 1 }} 
+        transition={{ delay: 0.3, duration: 0.8 }}
+        className="text-6xl md:text-8xl font-black mb-8 leading-[0.85] tracking-tighter"
+      >
+        Arquitecturas <br/> Que Definen El <span className="text-blue-500">Futuro.</span>
       </motion.h1>
-      <motion.p initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }} className="text-xl md:text-2xl text-blue-100/70 mb-12 leading-relaxed font-medium max-w-2xl">
-        La plataforma más avanzada para la adquisición de componentes electrónicos de grado industrial. Integración nativa con Supabase para seguimiento 24/7.
+      <motion.p 
+        initial={{ y: 30, opacity: 0 }} 
+        animate={{ y: 0, opacity: 1 }} 
+        transition={{ delay: 0.4 }}
+        className="text-xl md:text-2xl text-blue-100/70 mb-14 font-medium max-w-2xl leading-relaxed"
+      >
+        Potencia tus desarrollos con suministros certificados y asesoría técnica experta en tiempo real. 
       </motion.p>
-      <div className="flex flex-wrap gap-6">
+      <div className="flex flex-wrap gap-6 items-center">
         <motion.button 
-          whileHover={{ scale: 1.05 }}
+          whileHover={{ scale: 1.05, rotate: -1 }}
           whileTap={{ scale: 0.95 }}
           onClick={onExplore} 
-          className="bg-white text-slate-900 px-10 py-5 rounded-[2rem] font-black text-lg hover:bg-indigo-50 transition-all shadow-2xl shadow-white/10 flex items-center gap-3"
+          className="bg-[#3483fa] text-white px-14 py-6 rounded-[2rem] font-black text-2xl hover:bg-blue-600 transition-all shadow-[0_20px_40px_rgba(52,131,250,0.3)]"
         >
-          Explorar Catálogo <ChevronRight size={22} className="text-indigo-600" />
+          Explorar Ahora
         </motion.button>
-        <motion.button 
-          whileHover={{ scale: 1.05, backgroundColor: "rgba(255,255,255,0.15)" }}
-          whileTap={{ scale: 0.95 }}
-          onClick={onPlay} 
-          className="bg-white/10 backdrop-blur-2xl border border-white/20 text-white px-10 py-5 rounded-[2rem] font-black text-lg transition-all flex items-center gap-3"
-        >
-          <Gamepad2 size={24} className="text-indigo-400" /> Academia Osart
-        </motion.button>
-      </div>
-    </div>
-    <div className="absolute bottom-10 right-10 z-20 hidden lg:flex items-center gap-4 bg-black/30 backdrop-blur-xl p-4 rounded-[2rem] border border-white/10">
-      <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center animate-pulse">
-         <div className="w-3 h-3 bg-green-500 rounded-full shadow-[0_0_15px_rgba(34,197,94,0.8)]"></div>
-      </div>
-      <div>
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado Supabase</p>
-        <p className="text-sm font-black text-white">Sincronización Activa</p>
+        <div className="flex items-center gap-5 bg-white/5 backdrop-blur-2xl px-8 py-5 rounded-[2.5rem] border border-white/10 shadow-2xl">
+           <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center">
+              <div className="w-3.5 h-3.5 bg-green-500 rounded-full animate-ping"></div>
+           </div>
+           <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400 mb-0.5">Estado Global</p>
+              <p className="text-sm font-black text-white">Stock 100% Sincronizado</p>
+           </div>
+        </div>
       </div>
     </div>
   </section>

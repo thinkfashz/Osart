@@ -1,29 +1,33 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-// Always use the named parameter and direct access to process.env.API_KEY.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export async function askGeminiExpert(prompt: string, context: string = "") {
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Pregunta del cliente: ${prompt}`,
+      contents: `Consulta del cliente Osart: ${prompt}`,
       config: {
-        // Use systemInstruction for defining persona and static context.
-        systemInstruction: `Eres un experto senior en electrónica y robótica de la tienda "Osart Elite". 
-      Tu objetivo es ayudar a los clientes a encontrar componentes, explicar para qué sirven y dar consejos técnicos.
-      Sé amable, profesional y usa un tono tecnológico.
-      Contexto del catálogo: ${context}`,
-        temperature: 0.7,
-        topP: 0.8,
-        topK: 40,
+        systemInstruction: `Eres el System Pilot de Osart Elite.
+      Tu objetivo es proveer CONSEJOS TÉCNICOS PROFUNDOS de ingeniería electrónica y robótica.
+      
+      REGLAS DE RESPUESTA:
+      1. Si preguntan por un componente, explica su funcionamiento a nivel físico/eléctrico (ej: hablar de la arquitectura RISC en microcontroladores).
+      2. Siempre incluye un "Osart Engineer Tip" al final.
+      3. Usa un tono de experto senior, determinista y seguro.
+      4. Si el usuario pregunta por stock o precios, usa EXACTAMENTE los datos del contexto: ${context}.
+      5. Si no sabes algo, remite al manual técnico del fabricante.
+      
+      FORMATO: Usa Markdown para mejorar la legibilidad.`,
+        temperature: 0.5, // Menor temperatura para mayor determinismo técnico.
+        topP: 0.9,
       }
     });
-    // response.text property directly returns the extracted string output.
-    return response.text || "Lo siento, tuve un pequeño corto circuito mental. ¿Puedes repetir la pregunta?";
+    
+    return response.text || "Protocolo de comunicación fallido. Reiniciando enlace...";
   } catch (error) {
-    console.error("Gemini Error:", error);
-    return "Mi conexión con la base de datos central de Osart se ha interrumpido. Por favor intenta de nuevo en unos momentos.";
+    console.error("Agent Error:", error);
+    return "Error en la Capa 2 (Razonamiento). Por favor, contacte al soporte de Osart.";
   }
 }
