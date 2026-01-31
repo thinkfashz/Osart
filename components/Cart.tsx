@@ -17,91 +17,101 @@ const Cart: React.FC<CartProps> = ({ items, onUpdateQuantity, onRemove, onChecko
 
   if (items.length === 0) {
     return (
-      <div className="text-center py-32 bg-white rounded-[3rem] border border-dashed border-slate-200">
-        <div className="w-20 h-20 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-6">
+      <div className="text-center py-48 bg-white space-y-8">
+        <div className="w-24 h-24 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto shadow-sm">
           <ShoppingCart size={40} />
         </div>
-        <h2 className="text-2xl font-black text-slate-800 mb-2">Tu carrito está vacío</h2>
-        <p className="text-slate-500 mb-8 max-w-sm mx-auto">Parece que aún no has añadido componentes a tu próximo gran proyecto.</p>
-        <button onClick={onBack} className="bg-indigo-600 text-white px-8 py-3.5 rounded-2xl font-bold">Ir al Catálogo</button>
+        <div className="space-y-2">
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight">Your cart is empty</h2>
+          <p className="text-slate-400 font-medium">Add components to start your project.</p>
+        </div>
+        <button 
+          onClick={onBack} 
+          className="bg-indigo-600 text-white px-10 py-4 rounded-full font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-100"
+        >
+          Back to Shop
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-10">
+    <div className="max-w-6xl mx-auto space-y-12 py-10">
       <div className="flex items-center justify-between">
-        <button onClick={onBack} className="flex items-center gap-2 text-slate-500 font-bold hover:text-indigo-600 transition-colors">
-          <ArrowLeft size={20} /> Continuar Comprando
-        </button>
-        <h2 className="text-3xl font-black text-slate-900">Tu Carrito ({items.length})</h2>
+        <h2 className="text-4xl font-black text-slate-950 tracking-tighter">Your Bag</h2>
+        <span className="text-sm font-black text-slate-400 uppercase tracking-widest">{items.length} Items</span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-        <div className="lg:col-span-2 space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-16">
+        <div className="lg:col-span-2 space-y-8">
           {items.map((item) => (
             <motion.div 
               key={item.id}
               layout
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 flex gap-6 items-center"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex gap-8 items-start pb-8 border-b border-slate-100 group"
             >
-              <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl overflow-hidden bg-slate-50 shrink-0 border border-slate-100">
-                <img src={item.image} className="w-full h-full object-cover" alt={item.name} />
+              <div className="w-32 h-32 bg-[#f2f2f7] rounded-[2rem] flex items-center justify-center p-4 shrink-0 transition-transform group-hover:scale-105 duration-500">
+                <img src={item.image} className="w-full h-full object-contain" alt={item.name} />
               </div>
-              <div className="flex-grow">
-                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">{item.category}</p>
-                <h3 className="font-bold text-slate-800 text-lg mb-2 line-clamp-1">{item.name}</h3>
-                <div className="flex items-center justify-between mt-4">
-                  <div className="flex items-center gap-4 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
-                    <button onClick={() => onUpdateQuantity(item.id, -1)} className="p-1 hover:text-indigo-600 transition-colors">
-                      <Minus size={18} />
+              <div className="flex-grow space-y-2 pt-2">
+                <div className="flex justify-between items-start">
+                   <div>
+                     <h3 className="font-black text-slate-900 text-lg leading-tight">{item.name}</h3>
+                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.category}</p>
+                   </div>
+                   <p className="text-xl font-black text-slate-950">${(item.price * item.quantity).toLocaleString()}</p>
+                </div>
+                
+                <div className="flex items-center justify-between pt-6">
+                  <div className="flex items-center gap-6 bg-slate-50 px-4 py-2 rounded-full border border-slate-100">
+                    <button onClick={() => onUpdateQuantity(item.id, -1)} className="text-slate-400 hover:text-indigo-600 transition-colors">
+                      <Minus size={16} />
                     </button>
-                    <span className="font-black w-4 text-center">{item.quantity}</span>
-                    <button onClick={() => onUpdateQuantity(item.id, 1)} className="p-1 hover:text-indigo-600 transition-colors">
-                      <Plus size={18} />
+                    <span className="font-black text-sm text-slate-900">{item.quantity}</span>
+                    <button onClick={() => onUpdateQuantity(item.id, 1)} className="text-slate-400 hover:text-indigo-600 transition-colors">
+                      <Plus size={16} />
                     </button>
                   </div>
-                  <p className="text-xl font-black text-slate-900">${(item.price * item.quantity).toLocaleString()}</p>
+                  <button 
+                    onClick={() => onRemove(item.id)}
+                    className="text-[10px] font-black uppercase text-red-500 hover:text-red-600 transition-colors tracking-widest"
+                  >
+                    Remove
+                  </button>
                 </div>
               </div>
-              <button 
-                onClick={() => onRemove(item.id)}
-                className="w-12 h-12 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm"
-              >
-                <Trash2 size={20} />
-              </button>
             </motion.div>
           ))}
         </div>
 
         <div className="lg:col-span-1">
-          <div className="bg-white p-8 rounded-[3rem] shadow-xl border border-slate-100 sticky top-24">
-            <h3 className="text-2xl font-black text-slate-900 mb-8">Resumen</h3>
-            <div className="space-y-4 mb-10">
-              <div className="flex justify-between text-slate-500 font-medium">
+          <div className="bg-[#fcfcfd] p-10 rounded-[2.5rem] border border-slate-100 space-y-8">
+            <h3 className="text-2xl font-black text-slate-950 tracking-tight">Order Summary</h3>
+            <div className="space-y-4">
+              <div className="flex justify-between text-sm font-bold text-slate-500 uppercase tracking-widest">
                 <span>Subtotal</span>
-                <span>${subtotal.toLocaleString()}</span>
+                <span className="text-slate-950">${subtotal.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between text-slate-500 font-medium">
-                <span>Envío</span>
-                <span className="text-green-600 font-bold">Gratis</span>
+              <div className="flex justify-between text-sm font-bold text-slate-500 uppercase tracking-widest">
+                <span>Shipping</span>
+                <span className="text-green-600 font-black">Free</span>
               </div>
-              <div className="h-px bg-slate-100 my-6"></div>
-              <div className="flex justify-between text-3xl font-black text-slate-900">
-                <span>Total</span>
-                <span>${subtotal.toLocaleString()}</span>
+              <div className="h-px bg-slate-100 my-8"></div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">Total</span>
+                <span className="text-3xl font-black text-slate-950">${subtotal.toLocaleString()}</span>
               </div>
             </div>
             <button 
               onClick={onCheckout}
-              className="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold text-lg hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-slate-900/20 flex items-center justify-center gap-3"
+              className="w-full bg-indigo-600 text-white py-5 rounded-full font-black text-xs uppercase tracking-widest hover:bg-indigo-700 active:scale-95 transition-all shadow-xl shadow-indigo-100"
             >
-              <CreditCard size={22} /> Finalizar Compra
+              Checkout Now
             </button>
-            <div className="mt-6 flex items-center justify-center gap-2 text-slate-400 text-sm font-medium">
-              <ShieldCheck size={18} /> Transacciones Seguras SSL
+            <div className="pt-4 flex items-center justify-center gap-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">
+              <ShieldCheck size={16} /> Verified Secure Checkout
             </div>
           </div>
         </div>

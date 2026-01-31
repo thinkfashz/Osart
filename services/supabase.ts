@@ -1,28 +1,24 @@
 
-// Simulación de integración con Supabase para persistencia real
-// En un entorno real, usarías: import { createClient } from '@supabase/supabase-js'
+/**
+ * Integración Real con Supabase
+ * Para habilitar, añade NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY en Vercel.
+ */
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@^2.39.0';
 
-const SUPABASE_URL = "https://your-project.supabase.co";
-const SUPABASE_ANON_KEY = "your-anon-key";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
 
-// Mock del cliente de Supabase para demostrar la integración en la arquitectura
-export const supabase = {
-  auth: {
-    signUp: async (data: any) => ({ data: { user: { id: '123', ...data } }, error: null }),
-    signIn: async (data: any) => ({ data: { user: { id: '123', email: data.email } }, error: null }),
-    signOut: async () => ({ error: null }),
-  },
-  from: (table: string) => ({
-    select: () => ({
-      eq: (col: string, val: any) => ({ data: [], error: null }),
-      order: (col: string) => ({ data: [], error: null }),
-    }),
-    insert: (data: any) => ({ data, error: null }),
-  })
-};
+export const supabase = createClient(supabaseUrl, supabaseKey);
 
-export const saveOrderToSupabase = async (order: any) => {
-  console.log("Guardando orden en Supabase...", order);
-  const { data, error } = await supabase.from('orders').insert([order]);
-  return { data, error };
+export const saveOrder = async (order: any) => {
+  try {
+    const { data, error } = await supabase
+      .from('orders')
+      .insert([order]);
+    if (error) throw error;
+    return { data, success: true };
+  } catch (e) {
+    console.error("Error persistencia Supabase:", e);
+    return { success: false, error: e };
+  }
 };

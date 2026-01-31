@@ -1,9 +1,9 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Truck, Package, Bell, X, CheckCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AppView, Product, CartItem, User as UserType, Category } from './types';
+import { AppView, Product, CartItem, User as UserType, Category, Sale, Expense, StoreConfig } from './types';
 import { INITIAL_PRODUCTS } from './constants';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -15,40 +15,31 @@ import ElectroGame from './components/ElectroGame';
 import Profile from './components/Profile';
 import AuthModal from './components/AuthModal';
 import AIAssistant from './components/AIAssistant';
+import AdminDashboard from './components/AdminDashboard';
+import BottomNav from './components/BottomNav';
+import MobileMenu from './components/MobileMenu';
+import { CheckCircle, Truck, Package, MapPin, ChevronRight, RefreshCw, ShoppingBag, Terminal } from 'lucide-react';
 
 const App: React.FC = () => {
   const [view, setView] = useState<AppView>(AppView.HOME);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [storeConfig, setStoreConfig] = useState<StoreConfig>({
+    storeName: 'OSART ELITE',
+    primaryColor: 'indigo',
+    paymentUrl: 'https://api.webpay.cl/simulated',
+    shippingUrl: 'https://api.starken.cl/simulated',
+    contactEmail: 'contacto@osart.cl'
+  });
+  
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [user, setUser] = useState<UserType | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Category>('Todos');
-  const [lowStockAlerts, setLowStockAlerts] = useState<string[]>([]);
-
-  useEffect(() => {
-    const savedCart = localStorage.getItem('osart_cart');
-    if (savedCart) setCart(JSON.parse(savedCart));
-    const savedUser = localStorage.getItem('osart_user');
-    if (savedUser) setUser(JSON.parse(savedUser));
-  }, []);
-
-  useEffect(() => {
-    const criticalItems = cart.filter(item => item.stock < 5).map(item => item.name);
-    setLowStockAlerts(prev => {
-      const isDifferent = criticalItems.length !== prev.length || criticalItems.some(i => !prev.includes(i));
-      return isDifferent ? criticalItems : prev;
-    });
-  }, [cart]);
-
-  useEffect(() => {
-    localStorage.setItem('osart_cart', JSON.stringify(cart));
-  }, [cart]);
-
-  useEffect(() => {
-    if (user) localStorage.setItem('osart_user', JSON.stringify(user));
-    else localStorage.removeItem('osart_user');
-  }, [user]);
+  const [lastOrder, setLastOrder] = useState<Sale | null>(null);
 
   const addToCart = (product: Product) => {
     setCart(prev => {
@@ -60,188 +51,228 @@ const App: React.FC = () => {
     });
   };
 
-  const removeFromCart = (id: number) => {
-    setCart(prev => prev.filter(item => item.id !== id));
+  const handleCheckoutStart = () => {
+    setView(AppView.LOADING);
+    setTimeout(() => setView(AppView.DELIVERY), 1200);
   };
 
-  const updateQuantity = (id: number, delta: number) => {
-    setCart(prev => prev.map(item => {
-      if (item.id === id) {
-        const newQty = Math.max(1, item.quantity + delta);
-        return { ...item, quantity: newQty };
-      }
-      return item;
-    }));
+  const handleOrderComplete = (sale: Sale) => {
+    setSales(prev => [sale, ...prev]);
+    setLastOrder(sale);
+    if (user) {
+      setUser(u => u ? { ...u, orders: [sale, ...u.orders] } : null);
+    }
+    setCart([]);
+    setView(AppView.SUCCESS);
   };
 
-  const handleProductSelect = (product: Product) => {
-    setSelectedProduct(product);
-    setView(AppView.DETAIL);
-    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+  // Simulación de persistencia de XP
+  const addXP = (points: number) => {
+    setUser(u => u ? { ...u, learningPoints: u.learningPoints + points } : null);
   };
 
-  const pageVariants = {
-    initial: { opacity: 0, x: 10, y: 10 },
-    animate: { opacity: 1, x: 0, y: 0 },
-    exit: { opacity: 0, x: -10, y: -10 }
-  };
+  if (view === AppView.ADMIN) {
+    return (
+      <AdminDashboard 
+        products={products} setProducts={setProducts} 
+        sales={sales} expenses={expenses} setExpenses={setExpenses}
+        storeConfig={storeConfig} setStoreConfig={setStoreConfig}
+        onClose={() => setView(AppView.HOME)} 
+      />
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5] flex flex-col font-sans selection:bg-blue-100 selection:text-blue-900 overflow-x-hidden">
-      <motion.div 
-        initial={{ y: -50 }}
-        animate={{ y: 0 }}
-        className="bg-[#fff159] py-2 px-4 text-center text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] hidden md:block border-b border-black/5"
-      >
-        <div className="max-w-7xl mx-auto flex items-center justify-center gap-4">
-          <Truck size={16} className="text-blue-600" /> 
-          Envíos gratis en 24h para compras sobre $49.990
-          <span className="bg-blue-600 text-white px-3 py-0.5 rounded-full text-[9px] animate-pulse">SISTEMA SEGURO</span>
-        </div>
-      </motion.div>
-
+    <div className="min-h-screen bg-white flex flex-col font-sans selection:bg-indigo-100 selection:text-indigo-900 overflow-x-hidden">
       <Navbar 
-        view={view} 
-        setView={setView} 
+        view={view} setView={setView} 
         cartCount={cart.reduce((a, b) => a + b.quantity, 0)} 
-        user={user}
+        user={user} 
         onAuthClick={() => setShowAuthModal(true)}
-        hasLowStockAlert={lowStockAlerts.length > 0}
+        onMenuToggle={() => setIsMenuOpen(true)}
       />
 
-      <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        <div className="fixed top-24 right-6 z-[100] flex flex-col gap-4 pointer-events-none">
-          <AnimatePresence>
-            {lowStockAlerts.map((itemName) => (
-              <motion.div
-                key={itemName}
-                initial={{ opacity: 0, x: 50, scale: 0.9 }}
-                animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8, x: 20 }}
-                className="bg-white border-l-8 border-red-600 shadow-2xl p-5 rounded-2xl flex items-center gap-5 pointer-events-auto border border-slate-100 max-w-sm"
-              >
-                <div className="bg-red-50 p-3 rounded-xl shadow-inner">
-                  <Bell className="text-red-600 animate-ring" size={24} />
-                </div>
-                <div className="flex-1">
-                  <p className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-0.5">Stock Crítico</p>
-                  <p className="text-sm font-black text-slate-800 line-clamp-1">{itemName}</p>
-                </div>
-                <button 
-                  onClick={() => setLowStockAlerts(prev => prev.filter(n => n !== itemName))} 
-                  className="p-2 hover:bg-slate-50 rounded-xl text-slate-300 hover:text-red-600 transition-all"
-                >
-                  <X size={16} />
-                </button>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
+      <MobileMenu 
+        isOpen={isMenuOpen} 
+        onClose={() => setIsMenuOpen(false)} 
+        setView={setView} 
+      />
 
+      <main className="flex-grow max-w-7xl mx-auto px-6 lg:px-12 py-8 w-full">
         <AnimatePresence mode="wait">
-          {view === AppView.HOME && (
-            <motion.div key="home" variants={pageVariants} initial="initial" animate="animate" exit="exit">
-              <HeroSection onExplore={() => setView(AppView.CATALOG)} />
-              <div className="mb-16">
-                 <div className="flex items-center justify-between mb-10">
-                   <h2 className="text-4xl font-black text-slate-900 tracking-tighter flex items-center gap-4">
-                     <Package className="text-blue-600" /> Ingeniería Destacada
-                   </h2>
-                   <button onClick={() => setView(AppView.CATALOG)} className="bg-white px-6 py-3 rounded-2xl border border-slate-200 text-sm font-black text-blue-600 hover:border-blue-500 transition-all uppercase tracking-widest">Ver Catálogo</button>
-                 </div>
-                 <Catalog products={INITIAL_PRODUCTS} onProductSelect={handleProductSelect} onAddToCart={addToCart} searchQuery={searchQuery} setSearchQuery={setSearchQuery} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} />
-              </div>
+          {view === AppView.LOADING && (
+            <motion.div 
+              key="loading" 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="flex flex-col items-center justify-center py-48 text-center"
+            >
+               <RefreshCw size={48} className="text-indigo-600 animate-spin mb-8" />
+               <h2 className="text-3xl font-black text-slate-900 tracking-tight">Sincronizando Protocolos</h2>
+               <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.2em] mt-2">Encriptación de canal activa</p>
             </motion.div>
           )}
 
-          {view === AppView.CATALOG && (
-            <motion.div key="catalog" variants={pageVariants} initial="initial" animate="animate" exit="exit">
-              <Catalog products={INITIAL_PRODUCTS} onProductSelect={handleProductSelect} onAddToCart={addToCart} searchQuery={searchQuery} setSearchQuery={setSearchQuery} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} />
+          {(view === AppView.HOME || view === AppView.CATALOG) && (
+            <motion.div key="catalog" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+              <Catalog 
+                products={products} 
+                onProductSelect={(p) => { setSelectedProduct(p); setView(AppView.DETAIL); }} 
+                onAddToCart={addToCart} 
+                selectedCategory={selectedCategory} 
+                setSelectedCategory={setSelectedCategory} 
+              />
             </motion.div>
           )}
 
           {view === AppView.DETAIL && selectedProduct && (
-            <motion.div key="detail" variants={pageVariants} initial="initial" animate="animate" exit="exit">
-              <ProductDetail product={selectedProduct} onAddToCart={addToCart} onBack={() => setView(AppView.CATALOG)} />
-            </motion.div>
+            <ProductDetail product={selectedProduct} onAddToCart={addToCart} onBack={() => setView(AppView.CATALOG)} />
           )}
 
           {view === AppView.CART && (
-            <motion.div key="cart" variants={pageVariants} initial="initial" animate="animate" exit="exit">
-              <Cart items={cart} onUpdateQuantity={updateQuantity} onRemove={removeFromCart} onCheckout={() => setView(AppView.CHECKOUT)} onBack={() => setView(AppView.CATALOG)} />
+            <Cart items={cart} onUpdateQuantity={(id, d) => setCart(prev => prev.map(i => i.id === id ? {...i, quantity: Math.max(1, i.quantity + d)} : i))} onRemove={(id) => setCart(prev => prev.filter(i => i.id !== id))} onCheckout={handleCheckoutStart} onBack={() => setView(AppView.CATALOG)} />
+          )}
+
+          {view === AppView.DELIVERY && (
+            <motion.div key="delivery" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-3xl mx-auto space-y-12 py-16">
+               <div className="space-y-4">
+                  <h2 className="text-4xl font-black text-slate-900 tracking-tighter">Nodo de Distribución</h2>
+                  <p className="text-slate-500 font-medium">Selecciona el protocolo de entrega para tus componentes de ingeniería.</p>
+               </div>
+               <div className="space-y-6">
+                  <DeliveryOption 
+                    icon={Truck} 
+                    title="Despacho Priority" 
+                    price={4990} 
+                    address="Entrega técnica en 24h a domicilio" 
+                    onSelect={() => setView(AppView.CHECKOUT)} 
+                  />
+                  <DeliveryOption 
+                    icon={Package} 
+                    title="Retiro en Hub Osart" 
+                    price={0} 
+                    address="Linares Centro - Protocolo de retiro inmediato" 
+                    onSelect={() => setView(AppView.CHECKOUT)} 
+                  />
+               </div>
             </motion.div>
           )}
 
           {view === AppView.CHECKOUT && (
-            <motion.div key="checkout" variants={pageVariants} initial="initial" animate="animate" exit="exit">
-              <Checkout items={cart} user={user} onComplete={() => { setCart([]); setView(AppView.SUCCESS); }} onBack={() => setView(AppView.CART)} />
-            </motion.div>
-          )}
-
-          {view === AppView.SUCCESS && (
-            <motion.div key="success" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex flex-col items-center justify-center py-24 bg-white rounded-[4rem] shadow-2xl border border-slate-100 max-w-3xl mx-auto text-center">
-              <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-10 shadow-xl shadow-green-500/10">
-                <CheckCircle size={48} />
-              </div>
-              <h2 className="text-5xl font-black mb-4 tracking-tighter text-slate-900 leading-none uppercase">¡Órden Recibida!</h2>
-              <p className="text-lg text-slate-500 mb-12 max-w-md mx-auto font-medium leading-relaxed px-6">Tu pedido ha sido procesado exitosamente por nuestra red de logística.</p>
-              <div className="flex flex-col sm:flex-row gap-5 px-6 w-full max-w-md">
-                <button onClick={() => setView(AppView.HOME)} className="flex-grow bg-[#3483fa] text-white px-10 py-5 rounded-2xl font-black text-lg hover:bg-blue-600 transition-all shadow-xl shadow-blue-500/20 uppercase tracking-widest">Seguir Comprando</button>
-              </div>
-            </motion.div>
+            <Checkout items={cart} user={user} onComplete={handleOrderComplete} onBack={() => setView(AppView.DELIVERY)} />
           )}
 
           {view === AppView.GAME && (
-            <motion.div key="game" variants={pageVariants} initial="initial" animate="animate" exit="exit">
-              <ElectroGame onClose={() => setView(AppView.HOME)} onAddXP={(xp) => user && setUser({...user, learningPoints: user.learningPoints + xp})} />
-            </motion.div>
+            <ElectroGame onClose={() => setView(AppView.HOME)} onAddXP={addXP} />
           )}
 
           {view === AppView.PROFILE && user && (
-            <motion.div key="profile" variants={pageVariants} initial="initial" animate="animate" exit="exit">
-              <Profile user={user} onLogout={() => { setUser(null); setView(AppView.HOME); }} />
+            <Profile user={user} onLogout={() => { setUser(null); setView(AppView.HOME); }} />
+          )}
+
+          {view === AppView.SUCCESS && (
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+              className="max-w-4xl mx-auto text-center py-20 space-y-12"
+            >
+               <div className="relative inline-block">
+                  <div className="absolute inset-0 bg-green-500/20 blur-3xl animate-pulse"></div>
+                  <div className="w-32 h-32 bg-green-50 text-green-600 rounded-[3rem] flex items-center justify-center mx-auto shadow-2xl relative z-10">
+                    <CheckCircle size={64} />
+                  </div>
+               </div>
+               
+               <div className="space-y-4">
+                  <h2 className="text-5xl font-black text-slate-900 tracking-tighter">Despliegue Exitoso</h2>
+                  <p className="text-slate-400 font-black uppercase text-xs tracking-[0.3em]">Orden #{lastOrder?.id} • Protocolo Validado</p>
+               </div>
+
+               <div className="bg-slate-50 p-10 rounded-[3.5rem] border border-slate-100 max-w-lg mx-auto space-y-6 text-left">
+                  <div className="flex justify-between items-center">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inversión Final</p>
+                    <p className="text-2xl font-black text-indigo-600">${lastOrder?.total.toLocaleString()}</p>
+                  </div>
+                  <div className="h-px bg-slate-200" />
+                  <div className="flex gap-4 items-center">
+                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm"><Terminal size={24} /></div>
+                    <div>
+                      <p className="text-sm font-black text-slate-900 uppercase">Seguimiento en vivo</p>
+                      <p className="text-xs text-slate-500 font-medium">Enviamos el enlace de rastreo a {lastOrder?.customerEmail}</p>
+                    </div>
+                  </div>
+               </div>
+
+               <div className="flex flex-col sm:flex-row gap-6 justify-center">
+                 <button 
+                  onClick={() => setView(AppView.HOME)} 
+                  className="bg-indigo-600 text-white px-12 py-5 rounded-full font-black uppercase text-xs tracking-widest hover:bg-indigo-700 transition-all shadow-2xl shadow-indigo-100"
+                 >
+                   Regresar al Catálogo
+                 </button>
+                 <button 
+                  onClick={() => setView(AppView.PROFILE)} 
+                  className="bg-white border border-slate-200 text-slate-900 px-12 py-5 rounded-full font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all"
+                 >
+                   Ver mis Pedidos
+                 </button>
+               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </main>
 
       <Footer setView={setView} />
-      <AIAssistant context={JSON.stringify(INITIAL_PRODUCTS.map(p => ({ n: p.name, p: p.price, s: p.stock, c: p.category })))} />
-      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} onLogin={(u) => { setUser(u); setShowAuthModal(false); }} />}
+      
+      <BottomNav 
+        currentView={view} 
+        setView={setView} 
+        cartCount={cart.reduce((a, b) => a + b.quantity, 0)} 
+      />
+
+      <AIAssistant context={JSON.stringify(products.map(p => ({ id: p.id, name: p.name, price: p.price, stock: p.stock, cat: p.category })))} />
+      
+      <AnimatePresence>
+        {showAuthModal && (
+          <AuthModal 
+            onClose={() => setShowAuthModal(false)} 
+            onLogin={(u) => { 
+              const fullUser = {
+                ...u, 
+                role: u.email === 'admin@osart.cl' ? 'admin' : 'user',
+                learningPoints: 750, // Puntos iniciales de bienvenida
+                orders: []
+              } as UserType;
+              setUser(fullUser); 
+              setShowAuthModal(false); 
+              setView(AppView.HOME);
+            }} 
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };
 
-const HeroSection: React.FC<{ onExplore: () => void }> = ({ onExplore }) => (
-  <section className="relative rounded-[4rem] overflow-hidden mb-16 h-[450px] md:h-[600px] shadow-2xl border-4 border-white">
-    <motion.img 
-      initial={{ scale: 1.1 }}
-      animate={{ scale: 1 }}
-      transition={{ duration: 15, repeat: Infinity, repeatType: "reverse" }}
-      src="https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80" 
-      className="absolute inset-0 w-full h-full object-cover"
-      alt="Hardware Hero"
-    />
-    <div className="absolute inset-0 bg-gradient-to-r from-blue-950/95 via-blue-950/60 to-transparent"></div>
-    <div className="relative z-10 p-10 md:p-24 flex flex-col justify-center h-full max-w-4xl text-white">
-      <motion.div initial={{ x: -50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="mb-8">
-        <span className="text-[10px] font-black uppercase tracking-[0.5em] bg-red-600 px-8 py-3 rounded-full w-fit shadow-[0_0_30px_rgba(220,38,38,0.4)] border border-red-400/30">
-          Hardware de Precisión 2024
-        </span>
-      </motion.div>
-      <h1 className="text-6xl md:text-8xl font-black mb-8 leading-[0.85] tracking-tighter">
-        Arquitecturas <br/> Que Definen El <span className="text-blue-500">Futuro.</span>
-      </h1>
-      <p className="text-xl md:text-2xl text-blue-100/70 mb-14 font-medium max-w-2xl leading-relaxed">
-        Potencia tus desarrollos con suministros certificados y asesoría técnica experta. 
-      </p>
-      <div className="flex flex-wrap gap-6 items-center">
-        <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onExplore} className="bg-[#3483fa] text-white px-14 py-6 rounded-[2rem] font-black text-2xl hover:bg-blue-600 transition-all shadow-blue-500/30">
-          Explorar Ahora
-        </motion.button>
-      </div>
+const DeliveryOption: React.FC<{ icon: any, title: string, price: number, address: string, onSelect: () => void }> = ({ icon: Icon, title, price, address, onSelect }) => (
+  <button 
+    onClick={onSelect} 
+    className="w-full bg-white p-8 rounded-[3rem] border-2 border-slate-100 flex items-center justify-between hover:border-indigo-600 hover:shadow-2xl hover:shadow-indigo-50 transition-all text-left group active:scale-[0.98]"
+  >
+    <div className="flex gap-6 items-center">
+       <div className="w-16 h-16 bg-slate-50 rounded-[1.5rem] flex items-center justify-center text-slate-400 group-hover:text-indigo-600 group-hover:bg-indigo-50 transition-colors">
+          <Icon size={32} />
+       </div>
+       <div>
+          <p className="font-black text-slate-900 text-lg group-hover:text-indigo-600 transition-colors">{title}</p>
+          <p className="text-sm text-slate-400 font-medium">{address}</p>
+       </div>
     </div>
-  </section>
+    <div className="flex items-center gap-6">
+       <span className="font-black text-slate-950 text-xl">${price.toLocaleString()}</span>
+       <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:text-white group-hover:bg-indigo-600 transition-all shadow-inner">
+          <ChevronRight size={22} />
+       </div>
+    </div>
+  </button>
 );
 
 export default App;
