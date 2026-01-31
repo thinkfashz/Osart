@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Search, ShoppingCart, Cpu, Menu, LogIn, User, Bell, Terminal, ShieldCheck } from 'lucide-react';
+import { Search, ShoppingCart, Cpu, Menu, LogIn, User, Bell, Terminal, ShieldCheck, LayoutGrid } from 'lucide-react';
 import { AppView, User as UserType } from '../types';
 import { motion } from 'framer-motion';
 
@@ -14,6 +14,8 @@ interface NavbarProps {
 }
 
 const Navbar: React.FC<NavbarProps> = ({ view, setView, cartCount, user, onAuthClick, onMenuToggle }) => {
+  const isAdmin = user?.role === 'admin';
+
   return (
     <header className="w-full sticky top-0 z-[100] bg-white/80 backdrop-blur-3xl border-b border-slate-100">
       {/* Alerta de Sistema Superior */}
@@ -70,6 +72,18 @@ const Navbar: React.FC<NavbarProps> = ({ view, setView, cartCount, user, onAuthC
                 {item}
               </button>
             ))}
+            
+            {/* Acceso rápido Admin si el usuario tiene el rol */}
+            {isAdmin && (
+              <motion.button 
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                onClick={() => setView(AppView.ADMIN)}
+                className="bg-indigo-600/10 text-indigo-600 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border border-indigo-200 flex items-center gap-2 hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+              >
+                <Terminal size={14} /> Admin Panel
+              </motion.button>
+            )}
           </nav>
         </div>
 
@@ -110,7 +124,7 @@ const Navbar: React.FC<NavbarProps> = ({ view, setView, cartCount, user, onAuthC
                 </div>
                 <div className="hidden sm:flex flex-col items-start text-left">
                   <span className="text-[9px] font-black uppercase tracking-widest leading-none mb-0.5">{user.name.split(' ')[0]}</span>
-                  <span className="text-[8px] font-bold text-indigo-400 uppercase tracking-tighter">LVL {Math.floor(user.learningPoints / 500)} ENGINEER</span>
+                  <span className="text-[8px] font-bold text-indigo-400 uppercase tracking-tighter">{user.role === 'admin' ? 'ROOT ADMIN' : `LVL ${Math.floor(user.learningPoints / 500)} ENGINEER`}</span>
                 </div>
               </>
             ) : (
