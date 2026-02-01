@@ -1,12 +1,13 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Box, Server, ShoppingCart, DollarSign, Shield, Cpu, Zap, 
+  Server, ShoppingCart, DollarSign, Shield, Cpu, Zap, 
   Activity, Code, Lock, Fingerprint, ShieldCheck, AlertTriangle,
   LogOut, Plus, Search, Edit3, Trash2, X, Network, Terminal, Save,
   ArrowUpDown, ChevronDown, ChevronUp, Package, Filter, MoreHorizontal,
-  RefreshCcw, Layers, BarChart3, Archive
+  RefreshCcw, Layers, BarChart3, Archive, Menu, Settings, Globe, Mail, Palette,
+  Upload, Image as ImageIcon, Check
 } from 'lucide-react';
 import { Product, Sale, Expense, Category, StoreConfig, SystemLog, SecurityAudit } from '../types';
 import { auditSystemSecurity } from '../services/gemini';
@@ -30,15 +31,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [logs, setLogs] = useState<SystemLog[]>([]);
   const [isAuditing, setIsAuditing] = useState(false);
   const [auditResult, setAuditResult] = useState<SecurityAudit | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
-  // Estados de Inventario Dedicado
+  // Estados de Inventario
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<Category | 'Todos'>('Todos');
   const [filterStockStatus, setFilterStockStatus] = useState<'Todos' | 'Critico'>('Todos');
   const [sortConfig, setSortConfig] = useState<{ key: keyof Product, direction: 'asc' | 'desc' } | null>({ key: 'stock', direction: 'asc' });
-  const [editingThresholdId, setEditingThresholdId] = useState<number | null>(null);
 
-  // Logs de sistema simulados para la estética técnica
+  // Estado del Modal de Producto
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
   useEffect(() => {
     const interval = setInterval(() => {
       const newLog: SystemLog = {
@@ -54,7 +58,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return () => clearInterval(interval);
   }, []);
 
-  // Lógica de Procesamiento de Inventario
   const processedProducts = useMemo(() => {
     let filtered = products.filter(p => {
       const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -77,41 +80,65 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return filtered;
   }, [products, searchQuery, filterCategory, filterStockStatus, sortConfig]);
 
-  const toggleSort = (key: keyof Product) => {
-    setSortConfig(prev => {
-      if (prev?.key === key) {
-        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
-      }
-      return { key, direction: 'asc' };
-    });
-  };
-
   const handleUpdateStock = (id: number, delta: number) => {
     setProducts(prev => prev.map(p => 
       p.id === id ? { ...p, stock: Math.max(0, p.stock + delta) } : p
     ));
-    // Aquí iría el update de Supabase en producción
-  };
-
-  const handleUpdateThreshold = (id: number, val: number) => {
-    setProducts(prev => prev.map(p => 
-      p.id === id ? { ...p, lowStockThreshold: Math.max(0, val) } : p
-    ));
-    setEditingThresholdId(null);
   };
 
   const handleAudit = async () => {
     setIsAuditing(true);
     const result = await auditSystemSecurity(JSON.stringify({ 
       store: storeConfig.storeName, 
-      items: products.length, 
-      sales: sales.length 
+      items: products.length 
     }));
     setAuditResult(result);
     setIsAuditing(false);
   };
 
-  // KPIs de Inventario
+  const handleSaveProduct = (p: Product) => {
+    if (editingProduct) {
+      setProducts(prev => prev.map(item => item.id === p.id ? p : item));
+    } else {
+      setProducts(prev => [...prev, { ...p, id: Math.floor(Math.random() * 100000) }]);
+    }
+    setShowProductModal(false);
+    setEditingProduct(null);
+  };
+
+  const handleDeleteProduct = (id: number) => {
+    if (confirm('¿Confirmas la eliminación permanente de este protocolo de hardware?')) {
+      setProducts(prev => prev.filter(p => p.id !== id));
+    }
+  };
+
+  const handleSaveSettings = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSaveStatus('saving');
+    const formData = new FormData(e.currentTarget);
+    const updatedConfig: StoreConfig = {
+      storeName: formData.get('storeName') as string,
+      primaryColor: formData.get('primaryColor') as any,
+      paymentUrl: formData.get('paymentUrl') as string,
+      shippingUrl: formData.get('shippingUrl') as string,
+      contactEmail: formData.get('contactEmail') as string,
+    };
+    
+    setTimeout(() => {
+      setStoreConfig(updatedConfig);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    }, 1000);
+  };
+
+  const requestSort = (key: keyof Product) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
   const inventoryStats = useMemo(() => {
     const totalItems = products.reduce((acc, p) => acc + p.stock, 0);
     const criticalItems = products.filter(p => p.stock <= (p.lowStockThreshold || 5)).length;
@@ -119,27 +146,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return { totalItems, criticalItems, inventoryValue };
   }, [products]);
 
+  const tabs = [
+    { id: 'inventory', icon: Archive, label: 'Vault' },
+    { id: 'governance', icon: Shield, label: 'Security' },
+    { id: 'infrastructure', icon: Server, label: 'Nodes' },
+    { id: 'finances', icon: DollarSign, label: 'Ledger' },
+    { id: 'settings', icon: Settings, label: 'Config' }
+  ];
+
   return (
-    <div className="flex h-screen bg-[#020617] text-slate-200 font-sans overflow-hidden">
-      {/* Sidebar de Infraestructura */}
-      <aside className="w-72 bg-slate-950 border-r border-white/5 flex flex-col p-8 shrink-0">
+    <div className="flex flex-col lg:flex-row h-screen bg-[#020617] text-slate-200 font-sans overflow-hidden">
+      
+      {/* Sidebar - Solo para Desktop */}
+      <aside className="hidden lg:flex w-72 bg-slate-950 border-r border-white/5 flex-col p-8 shrink-0">
         <div className="flex items-center gap-4 mb-14">
-          <div className="w-12 h-12 animated-mesh rounded-2xl flex items-center justify-center shadow-2xl border border-white/10">
+          <div className="w-12 h-12 animated-mesh rounded-2xl flex items-center justify-center border border-white/10">
             <Cpu size={24} className="text-white" />
           </div>
           <div className="flex flex-col">
             <span className="font-black text-xl tracking-tighter uppercase leading-none">OSART <span className="text-indigo-500">ADMIN</span></span>
-            <span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.3em] mt-1">Infrastructure Kernel v6.0</span>
+            <span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.3em] mt-1">Kernel v6.0</span>
           </div>
         </div>
 
         <nav className="space-y-3 flex-grow">
-          {[
-            { id: 'inventory', icon: Archive, label: 'Vault Inventory' },
-            { id: 'governance', icon: Shield, label: 'Kernel Security' },
-            { id: 'infrastructure', icon: Server, label: 'Cloud Clusters' },
-            { id: 'finances', icon: DollarSign, label: 'Ledger Audit' }
-          ].map(tab => (
+          {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -149,404 +180,589 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 : 'text-slate-500 border-transparent hover:bg-white/5 hover:text-slate-300'
               }`}
             >
-              <tab.icon size={20} strokeWidth={2.5} />
+              <tab.icon size={20} />
               <span className="font-black text-[10px] uppercase tracking-widest">{tab.label}</span>
             </button>
           ))}
         </nav>
         
-        <button onClick={onClose} className="w-full flex items-center gap-4 p-4 text-slate-500 hover:text-red-500 transition-all font-black text-[10px] uppercase tracking-widest border border-white/5 rounded-2xl mt-auto">
-          <LogOut size={20} /> Cerrar Terminal
+        <button onClick={onClose} className="w-full flex items-center gap-4 p-4 text-slate-500 hover:text-red-500 font-black text-[10px] uppercase border border-white/5 rounded-2xl mt-auto">
+          <LogOut size={20} /> Logout
         </button>
       </aside>
 
-      {/* Viewport Principal */}
-      <main className="flex-grow p-12 overflow-y-auto relative scrollbar-hide">
-        <header className="flex justify-between items-center mb-16">
-          <div className="space-y-2">
-            <h2 className="text-4xl font-black text-white tracking-tighter uppercase leading-none">
-               {activeTab === 'inventory' ? 'Inventory Management' : activeTab}
-            </h2>
-            <div className="flex items-center gap-3">
-               <div className="flex gap-1">
-                  {[...Array(4)].map((_, i) => <div key={i} className="w-1 h-3 bg-indigo-500 rounded-full animate-pulse" style={{ animationDelay: `${i * 0.2}s` }} />)}
-               </div>
-               <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em]">Protocolo de Gestión Avanzada Activo</span>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-6">
-             <div className="flex flex-col items-end bg-slate-900/50 p-4 rounded-3xl border border-white/5 backdrop-blur-3xl px-8">
-                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Network Health</p>
-                <div className="flex items-center gap-2">
-                   <div className="w-2 h-2 bg-green-500 rounded-full animate-ping" />
-                   <p className="text-lg font-black text-green-500 tabular-nums">99.982%</p>
-                </div>
+      {/* Main Viewport */}
+      <main className="flex-grow flex flex-col relative overflow-hidden pb-24 lg:pb-0">
+        {/* Mobile Top Bar */}
+        <header className="lg:hidden flex justify-between items-center p-6 bg-slate-950/50 backdrop-blur-xl border-b border-white/5 sticky top-0 z-50">
+          <div className="flex items-center gap-3">
+             <div className="w-10 h-10 animated-mesh rounded-xl flex items-center justify-center">
+                <Cpu size={20} className="text-white" />
              </div>
-             <div className="w-14 h-14 bg-indigo-600/20 text-indigo-500 rounded-2xl flex items-center justify-center border border-indigo-500/20">
-                <Activity size={24} />
-             </div>
+             <span className="font-black text-sm uppercase tracking-tighter">OSART <span className="text-indigo-500">ADMIN</span></span>
           </div>
+          <button onClick={onClose} className="p-2 bg-white/5 rounded-xl text-slate-400">
+             <X size={20} />
+          </button>
         </header>
 
-        {activeTab === 'inventory' && (
-          <div className="space-y-10 pb-20">
-            {/* KPI Row */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-               <KPICard 
-                label="Valor del Stock" 
-                value={`$${inventoryStats.inventoryValue.toLocaleString()}`} 
-                icon={DollarSign} 
-                color="indigo" 
-               />
-               <KPICard 
-                label="Componentes Totales" 
-                value={inventoryStats.totalItems.toLocaleString()} 
-                icon={Layers} 
-                color="blue" 
-               />
-               <KPICard 
-                label="Alertas de Re-stock" 
-                value={inventoryStats.criticalItems.toString()} 
-                icon={AlertTriangle} 
-                color={inventoryStats.criticalItems > 0 ? "red" : "green"} 
-                isAlert={inventoryStats.criticalItems > 0}
-               />
-            </div>
-
-            {/* Control Bar */}
-            <div className="bg-slate-900/40 p-8 rounded-[3rem] border border-white/5 backdrop-blur-3xl flex flex-wrap items-center gap-6">
-              <div className="relative group flex-grow max-w-xl">
-                <Search size={20} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-500 transition-colors" />
-                <input 
-                  type="text" 
-                  placeholder="FILTRAR POR SKU O NOMBRE DE COMPONENTE..." 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-950 border border-white/10 rounded-[2rem] py-5 pl-16 pr-6 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-black text-[10px] uppercase tracking-widest text-white placeholder:text-slate-600"
-                />
-              </div>
-
-              <div className="relative group min-w-[240px]">
-                <Filter size={18} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-500" />
-                <select 
-                  value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value as any)}
-                  className="w-full bg-slate-950 border border-white/10 rounded-[2rem] py-5 pl-14 pr-10 outline-none focus:border-indigo-500 transition-all font-black text-[10px] uppercase tracking-widest text-white appearance-none cursor-pointer"
-                >
-                  <option value="Todos">Todas las Categorías</option>
-                  <option value="Microcontroladores">Microcontroladores</option>
-                  <option value="Seguridad">Seguridad</option>
-                  <option value="Sensores">Sensores</option>
-                  <option value="Herramientas">Herramientas</option>
-                  <option value="Robótica">Robótica</option>
-                </select>
-                <ChevronDown size={16} className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-              </div>
-
-              <button 
-                onClick={() => setFilterStockStatus(prev => prev === 'Todos' ? 'Critico' : 'Todos')}
-                className={`flex items-center gap-3 px-10 py-5 rounded-[2rem] font-black text-[10px] uppercase tracking-widest transition-all border ${
-                  filterStockStatus === 'Critico' 
-                  ? 'bg-red-600 border-red-500 text-white shadow-2xl shadow-red-600/40' 
-                  : 'bg-slate-950 border-white/10 text-slate-500 hover:border-red-500/50 hover:text-red-500'
-                }`}
-              >
-                <Zap size={16} />
-                {filterStockStatus === 'Critico' ? 'Ver Todos' : 'Ver Stock Bajo'}
-              </button>
-
-              <button className="bg-indigo-600 text-white px-8 py-5 rounded-[2rem] font-black text-[10px] uppercase tracking-widest shadow-2xl hover:bg-indigo-700 transition-all ml-auto flex items-center gap-3">
-                 <Plus size={18} /> New SKU
-              </button>
-            </div>
-
-            {/* Inventory Table */}
-            <div className="bg-slate-950 border border-white/5 rounded-[4rem] overflow-hidden shadow-2xl">
-               <table className="w-full text-left border-collapse">
-                  <thead className="bg-white/5">
-                     <tr className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">
-                        <th className="px-10 py-8">
-                           <button onClick={() => toggleSort('name')} className="flex items-center gap-2 hover:text-white transition-colors">
-                              Componente <ArrowUpDown size={14} />
-                           </button>
-                        </th>
-                        <th className="px-10 py-8 text-center">Categoría</th>
-                        <th className="px-10 py-8 text-center">
-                           <button onClick={() => toggleSort('stock')} className="flex items-center gap-2 hover:text-white transition-colors mx-auto">
-                              Inventario <ArrowUpDown size={14} />
-                           </button>
-                        </th>
-                        <th className="px-10 py-8 text-center">Umbral Crítico</th>
-                        <th className="px-10 py-8 text-right">
-                           <button onClick={() => toggleSort('price')} className="flex items-center gap-2 hover:text-white transition-colors ml-auto">
-                              Valor SKU <ArrowUpDown size={14} />
-                           </button>
-                        </th>
-                        <th className="px-10 py-8 text-center">Acciones</th>
-                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                     <AnimatePresence mode="popLayout">
-                        {processedProducts.map((p) => {
-                           const isCritical = p.stock <= (p.lowStockThreshold || 5);
-                           return (
-                              <motion.tr 
-                                 key={p.id}
-                                 layout
-                                 initial={{ opacity: 0 }}
-                                 animate={{ opacity: 1 }}
-                                 exit={{ opacity: 0 }}
-                                 className="group hover:bg-white/[0.02] transition-colors"
-                              >
-                                 <td className="px-10 py-8">
-                                    <div className="flex items-center gap-6">
-                                       <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center p-2.5 shadow-xl transition-transform group-hover:scale-105 duration-500">
-                                          <img src={p.image} className="w-full h-full object-contain" alt={p.name} />
-                                       </div>
-                                       <div className="space-y-1">
-                                          <p className="text-sm font-black text-white group-hover:text-indigo-400 transition-colors uppercase tracking-tight">{p.name}</p>
-                                          <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">SKU-{p.id}992-CL</p>
-                                       </div>
-                                    </div>
-                                 </td>
-                                 <td className="px-10 py-8 text-center">
-                                    <span className="bg-slate-900 border border-white/10 px-4 py-2 rounded-xl text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                                       {p.category}
-                                    </span>
-                                 </td>
-                                 <td className="px-10 py-8">
-                                    <div className="flex flex-col items-center gap-3">
-                                       <div className="flex items-center gap-4 bg-slate-900 rounded-2xl p-2 border border-white/5 shadow-inner">
-                                          <button 
-                                             onClick={() => handleUpdateStock(p.id, -1)}
-                                             className="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/5 rounded-xl transition-all"
-                                          >
-                                             <ChevronDown size={18} />
-                                          </button>
-                                          <span className={`text-xl font-black tabular-nums w-10 text-center ${isCritical ? 'text-red-500 animate-pulse' : 'text-white'}`}>
-                                             {p.stock}
-                                          </span>
-                                          <button 
-                                             onClick={() => handleUpdateStock(p.id, 1)}
-                                             className="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/5 rounded-xl transition-all"
-                                          >
-                                             <ChevronUp size={18} />
-                                          </button>
-                                       </div>
-                                       <div className="w-32 h-1 bg-white/5 rounded-full overflow-hidden">
-                                          <div 
-                                             className={`h-full transition-all duration-1000 ${isCritical ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'bg-indigo-600'}`}
-                                             style={{ width: `${Math.min(100, (p.stock / 20) * 100)}%` }}
-                                          />
-                                       </div>
-                                    </div>
-                                 </td>
-                                 <td className="px-10 py-8">
-                                    <div className="flex justify-center">
-                                       {editingThresholdId === p.id ? (
-                                          <div className="flex items-center gap-2">
-                                             <input 
-                                                type="number" 
-                                                autoFocus
-                                                defaultValue={p.lowStockThreshold || 5}
-                                                onBlur={(e) => handleUpdateThreshold(p.id, parseInt(e.target.value))}
-                                                onKeyDown={(e) => e.key === 'Enter' && handleUpdateThreshold(p.id, parseInt((e.target as HTMLInputElement).value))}
-                                                className="w-20 bg-indigo-600 text-white rounded-xl py-2 px-3 text-center text-sm font-black outline-none shadow-2xl shadow-indigo-600/30"
-                                             />
-                                          </div>
-                                       ) : (
-                                          <button 
-                                             onClick={() => setEditingThresholdId(p.id)}
-                                             className="flex flex-col items-center group/threshold"
-                                          >
-                                             <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest group-hover/threshold:text-indigo-400 transition-colors">Alert at</span>
-                                             <span className="text-lg font-black text-slate-300 group-hover/threshold:text-white">{p.lowStockThreshold || 5}</span>
-                                          </button>
-                                       )}
-                                    </div>
-                                 </td>
-                                 <td className="px-10 py-8 text-right">
-                                    <div className="flex flex-col items-end">
-                                       <p className="text-lg font-black text-white tabular-nums">${p.price.toLocaleString()}</p>
-                                       <p className="text-[9px] font-black text-slate-700 uppercase tracking-widest">Base Rate</p>
-                                    </div>
-                                 </td>
-                                 <td className="px-10 py-8">
-                                    <div className="flex justify-center gap-3">
-                                       <button className="p-4 bg-white/5 rounded-2xl text-slate-500 hover:text-white hover:bg-white/10 transition-all border border-white/5">
-                                          <Edit3 size={18} />
-                                       </button>
-                                       <button className="p-4 bg-white/5 rounded-2xl text-slate-500 hover:text-red-500 hover:bg-red-500/10 transition-all border border-white/5">
-                                          <Trash2 size={18} />
-                                       </button>
-                                    </div>
-                                 </td>
-                              </motion.tr>
-                           );
-                        })}
-                     </AnimatePresence>
-                  </tbody>
-               </table>
-               {processedProducts.length === 0 && (
-                  <div className="py-40 flex flex-col items-center justify-center text-center opacity-20">
-                     <Archive size={80} className="mb-6" />
-                     <p className="text-3xl font-black uppercase tracking-[0.4em]">Vault Empty</p>
-                     <p className="text-sm font-bold mt-2">No se encontraron componentes en el rango de búsqueda.</p>
-                  </div>
-               )}
+        {/* Contenido Dinámico */}
+        <div className="flex-grow overflow-y-auto p-4 lg:p-12 space-y-6 lg:space-y-10 scrollbar-hide">
+          
+          {/* Header de la Sección */}
+          <div className="space-y-1">
+            <h2 className="text-2xl lg:text-4xl font-black text-white tracking-tighter uppercase leading-none">
+               {activeTab === 'inventory' ? 'Vault Inventory' : activeTab === 'settings' ? 'Store Config' : activeTab}
+            </h2>
+            <div className="flex items-center gap-2">
+               <div className="w-1 h-3 bg-indigo-500 rounded-full animate-pulse" />
+               <span className="text-[8px] lg:text-[10px] font-black text-slate-500 uppercase tracking-widest">Protocolo de Gestión Activo</span>
             </div>
           </div>
-        )}
 
-        {activeTab === 'governance' && (
-           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-              <div className="lg:col-span-8 space-y-10">
-                {/* Visualizador de Red */}
-                <div className="bg-slate-900/40 p-12 rounded-[4rem] border border-white/5 relative overflow-hidden backdrop-blur-3xl group">
-                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent pointer-events-none" />
-                  <h3 className="text-xl font-black flex items-center gap-4 mb-12 uppercase tracking-tighter">
-                    <Network size={22} className="text-indigo-500" /> Latencia de Peticiones Globales
+          {activeTab === 'inventory' && (
+            <>
+              {/* KPIs Adaptativos */}
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-8">
+                 <KPICard label="Valuación" value={`$${inventoryStats.inventoryValue.toLocaleString()}`} icon={DollarSign} color="indigo" />
+                 <KPICard label="Critical" value={inventoryStats.criticalItems.toString()} icon={AlertTriangle} color="red" isAlert={inventoryStats.criticalItems > 0} />
+                 <div className="hidden lg:block">
+                   <KPICard label="Total SKU" value={inventoryStats.totalItems.toLocaleString()} icon={Layers} color="blue" />
+                 </div>
+              </div>
+
+              {/* Filtros Mobile-First */}
+              <div className="space-y-4 lg:space-y-0 lg:bg-slate-900/40 lg:p-8 lg:rounded-[3rem] lg:border lg:border-white/5 flex flex-col lg:flex-row items-center gap-4 lg:gap-6">
+                <div className="relative w-full lg:max-w-xl">
+                  <Search size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input 
+                    type="text" 
+                    placeholder="BUSCAR COMPONENTE..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-slate-900 lg:bg-slate-950 border border-white/10 rounded-2xl lg:rounded-[2rem] py-4 lg:py-5 pl-14 pr-6 outline-none focus:border-indigo-500 font-black text-[10px] uppercase text-white placeholder:text-slate-600"
+                  />
+                </div>
+                
+                <div className="flex w-full gap-3 overflow-x-auto scrollbar-hide">
+                   <button 
+                    onClick={() => setFilterStockStatus(prev => prev === 'Todos' ? 'Critico' : 'Todos')}
+                    className={`shrink-0 flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-[9px] uppercase border transition-all ${
+                      filterStockStatus === 'Critico' ? 'bg-red-600 border-red-500' : 'bg-slate-900 border-white/10 text-slate-500'
+                    }`}
+                   >
+                     <Zap size={14} /> Critical Only
+                   </button>
+                   <div className="shrink-0 relative">
+                     <select 
+                        value={filterCategory}
+                        onChange={(e) => setFilterCategory(e.target.value as any)}
+                        className="bg-slate-900 border border-white/10 rounded-2xl py-3 px-6 pr-10 outline-none font-black text-[9px] uppercase text-slate-500 appearance-none"
+                      >
+                        <option value="Todos">All Categories</option>
+                        <option value="Microcontroladores">MCUs</option>
+                        <option value="Seguridad">Security</option>
+                        <option value="Herramientas">Tools</option>
+                        <option value="Sensores">Sensors</option>
+                        <option value="Robótica">Robotics</option>
+                      </select>
+                      <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                   </div>
+                </div>
+              </div>
+
+              {/* Inventory List: Cards en Mobile, Tabla en Desktop con Sorting */}
+              <div className="space-y-4">
+                {/* Desktop Header con Sorting */}
+                <div className="hidden lg:grid grid-cols-12 gap-4 px-10 py-6 bg-white/5 rounded-t-[3rem] text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-white/5">
+                   <button onClick={() => requestSort('name')} className="col-span-4 flex items-center gap-2 hover:text-white transition-colors">
+                      Componente <ArrowUpDown size={12} />
+                   </button>
+                   <button onClick={() => requestSort('category')} className="col-span-2 text-center flex justify-center items-center gap-2 hover:text-white transition-colors">
+                      Categoría <ArrowUpDown size={12} />
+                   </button>
+                   <button onClick={() => requestSort('stock')} className="col-span-3 text-center flex justify-center items-center gap-2 hover:text-white transition-colors">
+                      Stock Control <ArrowUpDown size={12} />
+                   </button>
+                   <button onClick={() => requestSort('price')} className="col-span-2 text-right flex justify-end items-center gap-2 hover:text-white transition-colors">
+                      Precio <ArrowUpDown size={12} />
+                   </button>
+                   <div className="col-span-1 text-center">Audit</div>
+                </div>
+
+                <AnimatePresence mode="popLayout">
+                  {processedProducts.map((p) => (
+                    <InventoryItem 
+                      key={p.id} 
+                      product={p} 
+                      onUpdateStock={handleUpdateStock} 
+                      onEdit={() => { setEditingProduct(p); setShowProductModal(true); }}
+                      onDelete={() => handleDeleteProduct(p.id)}
+                    />
+                  ))}
+                </AnimatePresence>
+                
+                {processedProducts.length === 0 && (
+                   <div className="py-32 flex flex-col items-center justify-center text-center opacity-20">
+                      <Archive size={64} className="mb-4" />
+                      <p className="font-black uppercase tracking-widest">No matching assets</p>
+                   </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {activeTab === 'governance' && (
+             <div className="space-y-6">
+                <div className="bg-slate-900/40 p-6 lg:p-12 rounded-[2.5rem] lg:rounded-[4rem] border border-white/5 backdrop-blur-3xl overflow-hidden group">
+                  <h3 className="text-lg lg:text-xl font-black flex items-center gap-4 mb-8 uppercase tracking-tighter">
+                    <Network size={22} className="text-indigo-500" /> Latency Network
                   </h3>
-                  
-                  <div className="h-64 flex items-end gap-2 relative">
-                    {[...Array(40)].map((_, i) => (
+                  <div className="h-40 lg:h-64 flex items-end gap-1.5 relative">
+                    {[...Array(30)].map((_, i) => (
                       <motion.div 
                         key={i} 
-                        className="flex-grow bg-indigo-500/20 group-hover:bg-indigo-500/40 transition-colors rounded-t-lg"
+                        className="flex-grow bg-indigo-500/20 rounded-t-sm"
                         animate={{ height: `${Math.random() * 80 + 20}%` }}
-                        transition={{ duration: 1.5, repeat: Infinity, repeatType: 'reverse', delay: i * 0.05 }}
+                        transition={{ duration: 1, repeat: Infinity, repeatType: 'reverse', delay: i * 0.03 }}
                       />
                     ))}
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                       <div className="bg-slate-950/80 backdrop-blur-xl border border-white/10 px-8 py-4 rounded-3xl text-center shadow-2xl">
-                          <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Global Average</p>
-                          <p className="text-4xl font-black text-white">14.2 <span className="text-sm text-indigo-500">ms</span></p>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                       <div className="bg-slate-950/90 border border-white/10 px-6 py-3 rounded-2xl text-center">
+                          <p className="text-2xl lg:text-4xl font-black text-white tabular-nums">14.2ms</p>
+                          <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-1">Average Sync</p>
                        </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Gemini Security Hub */}
-                <div className="bg-slate-900/40 p-12 rounded-[4rem] border border-white/5 backdrop-blur-3xl relative">
-                  <div className="flex flex-col sm:flex-row justify-between items-center gap-8 mb-12">
-                    <div className="flex items-center gap-5">
-                      <div className="w-16 h-16 bg-purple-600/20 text-purple-400 rounded-3xl flex items-center justify-center border border-purple-500/20">
-                        <ShieldCheck size={28} />
+                <div className="bg-slate-950/40 p-6 lg:p-12 rounded-[2.5rem] lg:rounded-[4rem] border border-white/5 space-y-8">
+                   <div className="flex flex-col gap-6 lg:flex-row lg:justify-between items-center">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-purple-600/20 text-purple-400 rounded-2xl flex items-center justify-center border border-purple-500/20">
+                           <ShieldCheck size={24} />
+                        </div>
+                        <div className="text-center lg:text-left">
+                           <h4 className="font-black uppercase text-sm tracking-tighter">Gemini Auditor</h4>
+                           <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-1">Security Intelligence Layer</p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-black text-xl uppercase tracking-tighter leading-none">Security Auditor</h4>
-                        <p className="text-slate-500 text-[9px] font-black uppercase tracking-[0.3em] mt-1.5">Powered by Gemini 3 Pro Engineering</p>
+                      <button 
+                        onClick={handleAudit} 
+                        disabled={isAuditing}
+                        className="w-full lg:w-auto bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-2xl hover:bg-indigo-700 transition-all flex items-center justify-center gap-3"
+                      >
+                        {isAuditing ? <Activity size={16} className="animate-spin" /> : <Lock size={16} />}
+                        Run Security Scan
+                      </button>
+                   </div>
+                   
+                   {auditResult && (
+                      <div className="bg-white/5 p-6 rounded-3xl border border-white/10 space-y-4">
+                         <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">System Integrity</span>
+                            <span className="text-2xl font-black text-green-500">{auditResult.score}%</span>
+                         </div>
+                         <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                            <motion.div initial={{ width: 0 }} animate={{ width: `${auditResult.score}%` }} className="h-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
+                         </div>
+                      </div>
+                   )}
+                </div>
+             </div>
+          )}
+
+          {activeTab === 'settings' && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="max-w-4xl space-y-8"
+            >
+              <form onSubmit={handleSaveSettings} className="space-y-6 lg:space-y-10">
+                <div className="bg-slate-900/40 p-6 lg:p-12 rounded-[2.5rem] lg:rounded-[4rem] border border-white/5 backdrop-blur-3xl space-y-8 lg:space-y-12">
+                  
+                  {/* Store Name Section */}
+                  <div className="space-y-4 lg:space-y-6">
+                    <label className="flex items-center gap-3 text-[10px] lg:text-xs font-black uppercase tracking-[0.3em] text-indigo-400">
+                      <Terminal size={16} /> Identity_Protocol
+                    </label>
+                    <div className="bg-slate-950/50 border border-white/10 rounded-2xl lg:rounded-3xl p-4 lg:p-6">
+                      <input 
+                        name="storeName"
+                        defaultValue={storeConfig.storeName}
+                        required
+                        placeholder="NODO_NAME..."
+                        className="w-full bg-transparent border-none outline-none text-2xl lg:text-4xl font-black text-white uppercase tracking-tighter placeholder:text-slate-800"
+                      />
+                      <p className="text-[9px] font-bold text-slate-600 uppercase mt-2 tracking-widest">Nombre público en la red Osart</p>
+                    </div>
+                  </div>
+
+                  {/* Integration Section */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
+                    <div className="space-y-4">
+                      <label className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+                        <Globe size={14} /> Gateway_Sync
+                      </label>
+                      <div className="bg-slate-950/50 border border-white/10 rounded-2xl p-5">
+                        <input 
+                          name="paymentUrl"
+                          defaultValue={storeConfig.paymentUrl}
+                          className="w-full bg-transparent border-none outline-none text-xs font-black text-indigo-400 uppercase tracking-widest"
+                        />
                       </div>
                     </div>
-                    <button 
-                      onClick={handleAudit}
-                      disabled={isAuditing}
-                      className="bg-indigo-600 text-white px-10 py-5 rounded-[2rem] font-black text-[10px] uppercase tracking-widest shadow-2xl hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-3"
-                    >
-                      {isAuditing ? <Activity size={16} className="animate-spin" /> : <Lock size={16} />}
-                      {isAuditing ? 'Auditing...' : 'Run Audit Protocol'}
+                    <div className="space-y-4">
+                      <label className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+                        <Package size={14} /> Logistics_API
+                      </label>
+                      <div className="bg-slate-950/50 border border-white/10 rounded-2xl p-5">
+                        <input 
+                          name="shippingUrl"
+                          defaultValue={storeConfig.shippingUrl}
+                          className="w-full bg-transparent border-none outline-none text-xs font-black text-indigo-400 uppercase tracking-widest"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Palette Section */}
+                  <div className="space-y-6">
+                    <label className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+                      <Palette size={14} /> UI_Vibe_Palette
+                    </label>
+                    <div className="flex gap-4">
+                      {['blue', 'indigo', 'slate'].map((color) => (
+                        <label key={color} className="relative cursor-pointer group">
+                          <input 
+                            type="radio" 
+                            name="primaryColor" 
+                            value={color} 
+                            defaultChecked={storeConfig.primaryColor === color}
+                            className="peer sr-only" 
+                          />
+                          <div className={`w-16 h-16 lg:w-20 lg:h-20 rounded-2xl lg:rounded-3xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${
+                            color === 'blue' ? 'bg-blue-600 border-blue-500/20' : 
+                            color === 'indigo' ? 'bg-indigo-600 border-indigo-500/20' : 
+                            'bg-slate-600 border-slate-500/20'
+                          } peer-checked:ring-4 peer-checked:ring-white/20 peer-checked:border-white shadow-xl`}>
+                            <div className="w-2 h-2 bg-white rounded-full opacity-0 peer-checked:opacity-100 transition-opacity" />
+                            <span className="text-[8px] font-black uppercase text-white tracking-widest">{color}</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Contact Section */}
+                  <div className="space-y-4">
+                    <label className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+                      <Mail size={14} /> Contact_Hub
+                    </label>
+                    <div className="bg-slate-950/50 border border-white/10 rounded-2xl p-5">
+                      <input 
+                        name="contactEmail"
+                        type="email"
+                        defaultValue={storeConfig.contactEmail}
+                        className="w-full bg-transparent border-none outline-none text-xs font-black text-white tracking-widest"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <button 
+                  type="submit"
+                  disabled={saveStatus !== 'idle'}
+                  className={`w-full lg:w-auto px-12 py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-4 shadow-2xl ${
+                    saveStatus === 'saved' ? 'bg-green-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  }`}
+                >
+                  {saveStatus === 'saving' ? (
+                    <RefreshCcw size={18} className="animate-spin" />
+                  ) : saveStatus === 'saved' ? (
+                    <ShieldCheck size={18} />
+                  ) : (
+                    <Save size={18} />
+                  )}
+                  {saveStatus === 'saving' ? 'Sincronizando...' : saveStatus === 'saved' ? 'Protocolo Guardado' : 'Guardar Configuración'}
+                </button>
+              </form>
+            </motion.div>
+          )}
+        </div>
+
+        {/* Floating Action Button - Android Style para añadir producto */}
+        <button 
+          onClick={() => { setEditingProduct(null); setShowProductModal(true); }}
+          className="fixed bottom-28 lg:bottom-10 right-6 lg:right-12 w-14 h-14 lg:w-16 lg:h-16 bg-indigo-600 text-white rounded-2xl lg:rounded-3xl shadow-2xl shadow-indigo-600/40 flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-[60] border border-white/10"
+        >
+           <Plus size={28} />
+        </button>
+
+        {/* Bottom Navigation Bar - Mobile Only */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-20 bg-slate-950/80 backdrop-blur-2xl border-t border-white/5 px-4 flex items-center justify-between z-[100]">
+           {tabs.map(tab => {
+             const isActive = activeTab === tab.id;
+             return (
+               <button 
+                key={tab.id} 
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex flex-col items-center justify-center flex-1 gap-1 transition-all ${isActive ? 'text-white' : 'text-slate-500'}`}
+               >
+                  <div className={`p-2 rounded-xl transition-all ${isActive ? 'bg-indigo-600 shadow-xl shadow-indigo-600/20' : ''}`}>
+                    <tab.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                  </div>
+                  <span className="text-[8px] font-black uppercase tracking-widest">{tab.label}</span>
+               </button>
+             );
+           })}
+        </nav>
+
+        {/* Product Modal - Android Bottom Sheet en Mobile */}
+        <AnimatePresence>
+          {showProductModal && (
+            <div className="fixed inset-0 z-[200] flex items-end lg:items-center justify-center">
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }} 
+                onClick={() => { setShowProductModal(false); setEditingProduct(null); }}
+                className="absolute inset-0 bg-black/80 backdrop-blur-md" 
+              />
+              <motion.div 
+                initial={{ y: '100%', opacity: 0 }} 
+                animate={{ y: 0, opacity: 1 }} 
+                exit={{ y: '100%', opacity: 0 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="bg-[#0f172a] w-full max-w-4xl lg:rounded-[3rem] rounded-t-[3rem] shadow-2xl relative z-10 overflow-hidden border-t border-white/10 lg:border"
+              >
+                <div className="p-8 lg:p-12 overflow-y-auto max-h-[90vh] lg:max-h-[85vh] scrollbar-hide">
+                  <div className="flex justify-between items-center mb-10">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-indigo-600/20 text-indigo-400 rounded-2xl">
+                        <Archive size={24} />
+                      </div>
+                      <h3 className="text-2xl lg:text-3xl font-black text-white tracking-tighter uppercase leading-none">
+                         {editingProduct ? 'Update Asset' : 'Register New Asset'}
+                      </h3>
+                    </div>
+                    <button onClick={() => { setShowProductModal(false); setEditingProduct(null); }} className="p-3 bg-white/5 rounded-2xl text-slate-400 hover:text-white transition-colors">
+                      <X size={24} />
                     </button>
                   </div>
 
-                  <AnimatePresence mode="wait">
-                    {auditResult ? (
-                      <motion.div 
-                        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                        className="grid grid-cols-1 md:grid-cols-3 gap-8"
-                      >
-                        <div className="bg-slate-950/80 p-8 rounded-[2.5rem] border border-white/5 text-center flex flex-col items-center justify-center">
-                           <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4">Integrity Score</p>
-                           <p className="text-7xl font-black text-white leading-none">{auditResult.score}</p>
-                           <p className="text-[10px] font-black text-green-500 uppercase tracking-widest mt-6">Safe ✓</p>
-                        </div>
-                        
-                        <div className="md:col-span-2 space-y-6">
-                           <div className="bg-slate-950/50 p-8 rounded-[2.5rem] border border-white/5 space-y-5">
-                              <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                 <AlertTriangle size={12} className="text-amber-500" /> Vulnerabilities Found
-                              </h5>
-                              <div className="grid grid-cols-1 gap-3">
-                                 {auditResult.vulnerabilities.map((v, i) => (
-                                   <div key={i} className="bg-white/5 p-4 rounded-2xl border border-white/5 flex items-center gap-3">
-                                      <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
-                                      <span className="text-xs font-bold text-slate-300">{v}</span>
+                  <form 
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const fd = new FormData(e.currentTarget);
+                      const p: Product = {
+                        id: editingProduct?.id || 0,
+                        name: fd.get('name') as string,
+                        price: parseInt(fd.get('price') as string),
+                        stock: parseInt(fd.get('stock') as string),
+                        lowStockThreshold: parseInt(fd.get('lowStockThreshold') as string),
+                        category: fd.get('category') as Category,
+                        image: (fd.get('imagePreview') as string) || editingProduct?.image || 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80',
+                        description: fd.get('description') as string,
+                        rating: editingProduct?.rating || 5.0,
+                        guide: editingProduct?.guide || 'Manual técnico estándar.',
+                        proTip: editingProduct?.proTip || 'Validar polaridad antes de conexión.',
+                        specs: editingProduct?.specs || { "Version": "v1.0" }
+                      };
+                      handleSaveProduct(p);
+                    }} 
+                    className="space-y-8"
+                  >
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                       {/* Left Col: Info */}
+                       <div className="space-y-6">
+                          <div className="space-y-3">
+                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Asset Identity</label>
+                             <input name="name" defaultValue={editingProduct?.name} required placeholder="NAME OF COMPONENT..." className="w-full bg-slate-950 border border-white/10 rounded-2xl py-5 px-6 outline-none focus:border-indigo-500 font-black text-[11px] text-white uppercase" />
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-6">
+                            <div className="space-y-3">
+                               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Asset Class</label>
+                               <select name="category" defaultValue={editingProduct?.category || 'Microcontroladores'} className="w-full bg-slate-950 border border-white/10 rounded-2xl py-5 px-6 outline-none focus:border-indigo-500 font-black text-[11px] text-white uppercase appearance-none">
+                                  <option value="Microcontroladores">MCUs</option>
+                                  <option value="Pasivos">Pasivos</option>
+                                  <option value="Sensores">Sensors</option>
+                                  <option value="Robótica">Robotics</option>
+                                  <option value="Seguridad">Security</option>
+                                  <option value="Herramientas">Tools</option>
+                               </select>
+                            </div>
+                            <div className="space-y-3">
+                               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Market Price ($)</label>
+                               <input name="price" type="number" defaultValue={editingProduct?.price} required placeholder="00000" className="w-full bg-slate-950 border border-white/10 rounded-2xl py-5 px-6 outline-none focus:border-indigo-500 font-black text-[11px] text-white uppercase" />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-6">
+                            <div className="space-y-3">
+                               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Current Stock</label>
+                               <input name="stock" type="number" defaultValue={editingProduct?.stock} required placeholder="0" className="w-full bg-slate-950 border border-white/10 rounded-2xl py-5 px-6 outline-none focus:border-indigo-500 font-black text-[11px] text-white uppercase" />
+                            </div>
+                            <div className="space-y-3">
+                               <label className="text-[10px] font-black text-red-500 uppercase tracking-widest ml-1">Alert Threshold</label>
+                               <input name="lowStockThreshold" type="number" defaultValue={editingProduct?.lowStockThreshold || 5} required placeholder="5" className="w-full bg-slate-950 border border-red-500/20 rounded-2xl py-5 px-6 outline-none focus:border-red-500 font-black text-[11px] text-red-400 uppercase" />
+                            </div>
+                          </div>
+                       </div>
+
+                       {/* Right Col: Media & Description */}
+                       <div className="space-y-6">
+                          <div className="space-y-3">
+                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Hardware Blueprint</label>
+                             <div className="relative aspect-video rounded-3xl border-2 border-dashed border-white/10 bg-slate-950 flex flex-col items-center justify-center p-6 group hover:border-indigo-500/50 transition-colors overflow-hidden">
+                                {editingProduct?.image ? (
+                                   <>
+                                     <img src={editingProduct.image} className="absolute inset-0 w-full h-full object-contain opacity-40 blur-sm" />
+                                     <img src={editingProduct.image} className="relative z-10 w-32 h-32 object-contain" />
+                                   </>
+                                ) : (
+                                   <div className="flex flex-col items-center gap-3">
+                                      <ImageIcon size={40} className="text-slate-800" />
+                                      <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">No visual asset loaded</p>
                                    </div>
-                                 ))}
-                              </div>
-                           </div>
-                        </div>
-                      </motion.div>
-                    ) : (
-                      <div className="py-24 flex flex-col items-center justify-center text-slate-700 border-2 border-dashed border-white/5 rounded-[4rem]">
-                         <Fingerprint size={64} className="mb-6 opacity-10" />
-                         <p className="text-[10px] font-black uppercase tracking-[0.4em] opacity-30 text-center">Inicie el protocolo para auditoría de capa 3</p>
-                      </div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </div>
+                                )}
+                                <div className="mt-4 flex flex-col items-center">
+                                   <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2">Simulated Image Upload</p>
+                                   <input 
+                                    type="text" 
+                                    name="imagePreview" 
+                                    placeholder="PASTE IMAGE URL..." 
+                                    className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-[8px] font-black text-white w-full outline-none focus:border-indigo-500" 
+                                   />
+                                </div>
+                             </div>
+                          </div>
 
-              {/* Terminal Column */}
-              <div className="lg:col-span-4 space-y-10">
-                <div className="bg-slate-950 p-8 rounded-[3rem] border border-white/5 h-[800px] flex flex-col font-mono relative overflow-hidden">
-                  <div className="absolute inset-0 bg-indigo-500/5 opacity-10 pointer-events-none" />
-                  <div className="flex items-center justify-between mb-8 border-b border-white/5 pb-4 relative z-10">
-                     <h4 className="font-black text-[10px] uppercase tracking-[0.4em] text-slate-500 flex items-center gap-2">
-                       <Terminal size={12} /> Root Activity Logs
-                     </h4>
-                     <div className="flex gap-1.5">
-                        <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
-                        <div className="w-2 h-2 bg-slate-800 rounded-full" />
-                     </div>
-                  </div>
-                  
-                  <div className="space-y-4 flex-grow overflow-y-auto scrollbar-hide relative z-10">
-                    {logs.map(log => (
-                      <div key={log.id} className="text-[10px] space-y-1 p-3 bg-white/5 rounded-xl border border-white/5 group hover:border-indigo-500/30 transition-colors">
-                        <div className="flex justify-between">
-                          <span className="text-indigo-400 font-black tracking-tight">[{log.event}]</span>
-                          <span className={`${log.status === 'error' ? 'text-red-500' : log.status === 'warning' ? 'text-amber-500' : 'text-green-500'} font-bold`}>{log.status.toUpperCase()}</span>
-                        </div>
-                        <div className="text-slate-500 flex justify-between font-medium">
-                           <span>{log.timestamp}</span>
-                           <span className="opacity-50">{log.latency}ms / {log.payloadSize}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                          <div className="space-y-3">
+                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Engineering Description</label>
+                             <textarea name="description" defaultValue={editingProduct?.description} rows={4} className="w-full bg-slate-950 border border-white/10 rounded-2xl py-5 px-6 outline-none focus:border-indigo-500 font-black text-[11px] text-white uppercase resize-none scrollbar-hide" placeholder="TECHNICAL OVERVIEW..." />
+                          </div>
+                       </div>
+                    </div>
 
-                  <div className="mt-8 pt-4 border-t border-white/5 relative z-10">
-                     <div className="bg-white/5 p-4 rounded-2xl border border-white/5 flex items-center gap-4">
-                        <Code size={16} className="text-indigo-500" />
-                        <span className="text-[10px] font-black uppercase text-slate-400">Node Ready: Listening...</span>
-                     </div>
-                  </div>
+                    <div className="flex flex-col lg:flex-row gap-4 pt-6">
+                       <button 
+                        type="submit" 
+                        className="flex-grow bg-indigo-600 text-white px-10 py-5 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-2xl shadow-indigo-600/20 hover:bg-indigo-700 transition-all flex items-center justify-center gap-3"
+                       >
+                         <Check size={18} /> {editingProduct ? 'Commit Changes' : 'Execute Asset Registry'}
+                       </button>
+                       <button 
+                        type="button" 
+                        onClick={() => { setShowProductModal(false); setEditingProduct(null); }}
+                        className="bg-white/5 text-slate-400 px-10 py-5 rounded-2xl font-black text-[11px] uppercase tracking-widest border border-white/5 hover:bg-white/10 transition-all"
+                       >
+                         Cancel Protocol
+                       </button>
+                    </div>
+                  </form>
                 </div>
-              </div>
-           </div>
-        )}
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </main>
     </div>
   );
 };
 
-// Componentes Atómicos para el Dashboard
+// Componente para items de inventario (Tabla Desktop / Cards Mobile)
+const InventoryItem: React.FC<{ product: any, onUpdateStock: any, onEdit: any, onDelete: any }> = ({ product, onUpdateStock, onEdit, onDelete }) => {
+  const isCritical = product.stock <= (product.lowStockThreshold || 5);
+
+  return (
+    <motion.div 
+      layout
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`group bg-slate-900/40 lg:bg-transparent lg:grid lg:grid-cols-12 lg:gap-4 p-4 lg:p-10 rounded-3xl lg:rounded-none lg:border-b lg:border-white/5 transition-all hover:bg-white/[0.02] border border-white/5 lg:border-x-0 lg:border-t-0 ${isCritical ? 'border-red-500/20 bg-red-500/[0.02]' : ''}`}
+    >
+      {/* Visual & Identity */}
+      <div className="lg:col-span-4 flex items-center gap-4 lg:gap-6 mb-4 lg:mb-0">
+        <div className="w-16 h-16 lg:w-14 lg:h-14 bg-white rounded-2xl flex items-center justify-center p-3 shadow-xl shrink-0">
+          <img src={product.image} className="w-full h-full object-contain" alt={product.name} />
+        </div>
+        <div className="space-y-1 overflow-hidden">
+          <p className="text-sm font-black text-white uppercase truncate tracking-tight">{product.name}</p>
+          <div className="flex items-center gap-2">
+             <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">SKU-{product.id}</span>
+             <span className="lg:hidden text-[8px] font-black text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded-md uppercase tracking-widest">{product.category}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Category - Desktop Only */}
+      <div className="hidden lg:flex lg:col-span-2 items-center justify-center">
+        <span className="bg-slate-950 border border-white/10 px-3 py-1.5 rounded-lg text-[8px] font-black text-slate-500 uppercase tracking-widest">
+           {product.category}
+        </span>
+      </div>
+
+      {/* Stock Controls */}
+      <div className="lg:col-span-3 flex flex-col items-center justify-center gap-3 bg-slate-950/30 lg:bg-transparent p-4 lg:p-0 rounded-2xl border border-white/5 lg:border-none">
+        <div className="flex items-center gap-6 lg:gap-4">
+          <button 
+            onClick={() => onUpdateStock(product.id, -1)}
+            className="w-12 h-12 lg:w-10 lg:h-10 flex items-center justify-center bg-white/5 text-slate-500 hover:text-white rounded-xl active:bg-indigo-600 transition-all border border-white/5"
+          >
+            <ChevronDown size={20} />
+          </button>
+          <div className="text-center min-w-[3rem]">
+            <span className={`text-2xl lg:text-xl font-black tabular-nums ${isCritical ? 'text-red-500 animate-pulse' : 'text-white'}`}>
+              {product.stock}
+            </span>
+            <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest mt-0.5">Alert @ {product.lowStockThreshold || 5}</p>
+          </div>
+          <button 
+            onClick={() => onUpdateStock(product.id, 1)}
+            className="w-12 h-12 lg:w-10 lg:h-10 flex items-center justify-center bg-white/5 text-slate-500 hover:text-white rounded-xl active:bg-indigo-600 transition-all border border-white/5"
+          >
+            <ChevronUp size={20} />
+          </button>
+        </div>
+        <div className="w-full max-w-[120px] h-1.5 bg-white/5 rounded-full overflow-hidden">
+           <div 
+             className={`h-full transition-all duration-1000 ${isCritical ? 'bg-red-500' : 'bg-indigo-600'}`}
+             style={{ width: `${Math.min(100, (product.stock / 20) * 100)}%` }}
+           />
+        </div>
+      </div>
+
+      {/* Price & Actions */}
+      <div className="lg:col-span-2 flex justify-between lg:flex-col lg:items-end lg:justify-center mt-4 lg:mt-0 px-2 lg:px-0">
+         <div className="text-left lg:text-right">
+            <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest lg:mb-1">Market Value</p>
+            <p className="text-lg lg:text-xl font-black text-white tabular-nums">${product.price.toLocaleString()}</p>
+         </div>
+         <div className="flex gap-2">
+            <button onClick={onEdit} className="p-3 bg-white/5 rounded-xl text-slate-500 hover:text-white border border-white/5"><Edit3 size={16} /></button>
+            <button onClick={onDelete} className="p-3 bg-white/5 rounded-xl text-slate-500 hover:text-red-500 border border-white/5"><Trash2 size={16} /></button>
+         </div>
+      </div>
+
+      <div className="hidden lg:flex lg:col-span-1 items-center justify-center">
+         <MoreHorizontal size={20} className="text-slate-600 group-hover:text-white cursor-pointer transition-colors" />
+      </div>
+    </motion.div>
+  );
+};
+
 const KPICard: React.FC<{ label: string, value: string, icon: any, color: string, isAlert?: boolean }> = ({ label, value, icon: Icon, color, isAlert }) => (
-  <div className={`bg-slate-900/40 p-8 rounded-[3.5rem] border transition-all ${isAlert ? 'border-red-500/30 shadow-[0_20px_50px_rgba(239,68,68,0.1)]' : 'border-white/5 hover:border-indigo-500/20'}`}>
-     <div className="flex justify-between items-start mb-6">
-        <div className={`p-4 rounded-[1.25rem] ${isAlert ? 'bg-red-600 text-white' : `bg-${color}-600/20 text-${color}-400`}`}>
-           <Icon size={24} />
+  <div className={`p-5 lg:p-8 rounded-3xl lg:rounded-[3.5rem] border transition-all ${isAlert ? 'bg-red-500/10 border-red-500/30' : 'bg-slate-900/40 border-white/5'}`}>
+     <div className="flex justify-between items-start mb-4 lg:mb-6">
+        <div className={`p-3 lg:p-4 rounded-xl lg:rounded-[1.25rem] ${isAlert ? 'bg-red-600 text-white' : `bg-${color}-600/20 text-${color}-400`}`}>
+           <Icon size={18} className="lg:w-6 lg:h-6" />
         </div>
-        <BarChart3 size={18} className="text-slate-700" />
+        <BarChart3 size={16} className="text-slate-700 hidden lg:block" />
      </div>
-     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">{label}</p>
-     <p className="text-3xl font-black text-white tracking-tighter tabular-nums">{value}</p>
-     {isAlert && (
-        <div className="mt-4 flex items-center gap-2 text-[9px] font-black text-red-500 uppercase tracking-widest">
-           <AlertTriangle size={12} /> Critically low resources
-        </div>
-     )}
+     <p className="text-[8px] lg:text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{label}</p>
+     <p className="text-lg lg:text-3xl font-black text-white tabular-nums truncate">{value}</p>
   </div>
 );
 

@@ -71,6 +71,26 @@ const App: React.FC = () => {
     setUser(u => u ? { ...u, learningPoints: u.learningPoints + points } : null);
   };
 
+  const handleLogin = (u: any) => {
+    const isAdmin = u.email === 'admin@osart.cl';
+    const fullUser = {
+      ...u, 
+      role: isAdmin ? 'admin' : 'user',
+      learningPoints: isAdmin ? 9999 : 750, // Los admins tienen XP máximo por defecto
+      orders: []
+    } as UserType;
+    
+    setUser(fullUser); 
+    setShowAuthModal(false); 
+    
+    // Redirección automática si es Administrador
+    if (isAdmin) {
+      setView(AppView.ADMIN);
+    } else {
+      setView(AppView.HOME);
+    }
+  };
+
   if (view === AppView.ADMIN) {
     return (
       <AdminDashboard 
@@ -234,17 +254,7 @@ const App: React.FC = () => {
         {showAuthModal && (
           <AuthModal 
             onClose={() => setShowAuthModal(false)} 
-            onLogin={(u) => { 
-              const fullUser = {
-                ...u, 
-                role: u.email === 'admin@osart.cl' ? 'admin' : 'user',
-                learningPoints: 750, // Puntos iniciales de bienvenida
-                orders: []
-              } as UserType;
-              setUser(fullUser); 
-              setShowAuthModal(false); 
-              setView(AppView.HOME);
-            }} 
+            onLogin={handleLogin} 
           />
         )}
       </AnimatePresence>
