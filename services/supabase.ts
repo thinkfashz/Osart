@@ -2,27 +2,39 @@
 import { createClient } from '@supabase/supabase-js';
 import { ActivityLog, User as UserType } from '../types';
 
-// En fase de pruebas, estas variables pueden estar vacías. 
-// Usamos el operador de cortocircuito para evitar pasar strings vacíos al constructor.
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+// Obtenemos las variables de entorno de Next.js
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 /**
- * Cliente de Supabase seguro para entornos de prueba.
- * Si las credenciales no son URLs válidas, el cliente se mantiene nulo para evitar crashes.
+ * Validación de URL para evitar el error 'supabaseUrl is required'.
+ * Solo inicializa el cliente si la URL es una cadena válida que empieza con http.
  */
-export const supabase = (supabaseUrl && supabaseUrl.startsWith('http')) 
-  ? createClient(supabaseUrl, supabaseKey) 
+const isValidUrl = (url?: string) => {
+  if (!url || typeof url !== 'string') return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Cliente de Supabase exportado de forma segura.
+ * Si las credenciales no son válidas, se exporta null y el resto de la app
+ * maneja esta ausencia de forma silenciosa (Modo Simulación).
+ */
+export const supabase = (isValidUrl(supabaseUrl) && supabaseKey) 
+  ? createClient(supabaseUrl as string, supabaseKey as string) 
   : null;
 
-/**
- * Sincroniza el perfil del usuario y sus puntos XP de forma segura.
- */
+if (!supabase) {
+  console.warn("[Osart Systems] Supabase no detectado o URL inválida. Iniciando en Modo Simulación Local.");
+}
+
 export const syncUserProfile = async (user: UserType) => {
-  if (!supabase) {
-    console.warn("[Osart Sync] Supabase no configurado. El perfil se mantiene en sesión local.");
-    return null;
-  }
+  if (!supabase) return null;
   try {
     const { data, error } = await supabase
       .from('profiles')
@@ -41,12 +53,9 @@ export const syncUserProfile = async (user: UserType) => {
   }
 };
 
-/**
- * Registra una acción en el historial de actividad (Ledger) solo si la conexión está activa.
- */
 export const recordActivity = async (log: ActivityLog) => {
   if (!supabase) {
-    console.debug("[Osart Ledger] Actividad local registrada:", log.action);
+    console.debug(`[Ledger Local] ${log.action}: ${log.details}`);
     return;
   }
   try {
@@ -65,9 +74,6 @@ export const recordActivity = async (log: ActivityLog) => {
   }
 };
 
-/**
- * Actualiza los puntos XP tras un juego exitoso con manejo de errores.
- */
 export const updateUserXP = async (email: string, pointsToAdd: number) => {
   if (!supabase) return null;
   try {

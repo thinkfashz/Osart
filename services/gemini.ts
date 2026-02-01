@@ -1,8 +1,23 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
+/**
+ * Helper para inicializar IA de forma segura.
+ * Solo crea la instancia si existe una API_KEY válida.
+ */
+const getAIClient = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey || apiKey === 'undefined') {
+    console.warn("[Osart AI] API_KEY no configurada. Las funciones de IA retornarán respuestas de error controladas.");
+    return null;
+  }
+  return new GoogleGenAI({ apiKey });
+};
+
 export async function askGeminiExpert(prompt: string, context: string = "") {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAIClient();
+  if (!ai) return "Protocolo de IA fuera de línea. Verifique la API_KEY del sistema.";
+
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -12,7 +27,7 @@ export async function askGeminiExpert(prompt: string, context: string = "") {
         Tus respuestas deben ser técnicas, precisas y enfocadas en la resolución de problemas de hardware. 
         Utiliza el siguiente contexto del catálogo para recomendar productos específicos si el usuario lo requiere: ${context}.
         Si no sabes algo técnico, admítelo y sugiere consultar los datasheets oficiales.`,
-        temperature: 0.3, // Menor temperatura para respuestas más deterministas y técnicas
+        temperature: 0.3,
       }
     });
     return response.text || "Protocolo de comunicación fallido. Reintente sincronización.";
@@ -23,7 +38,9 @@ export async function askGeminiExpert(prompt: string, context: string = "") {
 }
 
 export async function auditSystemSecurity(systemState: string) {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAIClient();
+  if (!ai) return { score: 0, vulnerabilities: ["IA Offline"], recommendations: ["Configurar API_KEY"] };
+
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
@@ -48,6 +65,6 @@ export async function auditSystemSecurity(systemState: string) {
     return JSON.parse(response.text);
   } catch (error) {
     console.error("Audit Error:", error);
-    return null;
+    return { score: 0, vulnerabilities: ["Fallo en Auditoría"], recommendations: ["Revisar logs de servidor"] };
   }
 }
