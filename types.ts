@@ -20,8 +20,31 @@ export interface Product {
   discountPercentage?: number;
 }
 
+export interface ActivityLog {
+  id: string;
+  userId: string;
+  userName: string;
+  action: string;
+  category: 'auth' | 'commerce' | 'gaming' | 'admin';
+  timestamp: string;
+  details: string;
+}
+
 export interface CartItem extends Product {
   quantity: number;
+}
+
+/**
+ * Interface representing the customer's shipping information collected during checkout.
+ */
+export interface ShippingDetails {
+  fullName: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  region: string;
+  zipCode: string;
 }
 
 export interface Sale {
@@ -65,16 +88,7 @@ export interface User {
   role?: 'admin' | 'user';
   learningPoints: number;
   orders: any[];
-}
-
-export interface ShippingDetails {
-  fullName: string;
-  email: string;
-  phone: string;
-  address: string;
-  city: string;
-  region: string;
-  zipCode: string;
+  history?: ActivityLog[];
 }
 
 export interface StoreConfig {
