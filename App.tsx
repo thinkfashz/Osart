@@ -18,7 +18,8 @@ import AIAssistant from './components/AIAssistant';
 import AdminDashboard from './components/AdminDashboard';
 import BottomNav from './components/BottomNav';
 import MobileMenu from './components/MobileMenu';
-import { CheckCircle, Truck, Package, MapPin, ChevronRight, RefreshCw, ShoppingBag, Terminal } from 'lucide-react';
+import { recordActivity, syncUserProfile, updateUserXP } from './services/supabase';
+import { CheckCircle, RefreshCw, ShoppingBag, Terminal } from 'lucide-react';
 
 const App: React.FC = () => {
   const [view, setView] = useState<AppView>(AppView.HOME);
@@ -53,10 +54,12 @@ const App: React.FC = () => {
       details
     };
     setActivityLogs(prev => [newLog, ...prev]);
+    // Intentamos registrar, si falla (por falta de env vars) no bloqueamos el hilo principal
+    recordActivity(newLog).catch(() => {}); 
   };
 
   const addToCart = (product: Product) => {
-    logActivity('Agregado al Carrito', 'commerce', `SKU: ${product.id} - ${product.name}`);
+    logActivity('🛒 Agregado al Carrito', 'commerce', `SKU: ${product.id} - ${product.name}`);
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
@@ -66,13 +69,8 @@ const App: React.FC = () => {
     });
   };
 
-  const handleCheckoutStart = () => {
-    setView(AppView.LOADING);
-    setTimeout(() => setView(AppView.DELIVERY), 1200);
-  };
-
   const handleOrderComplete = (sale: Sale) => {
-    logActivity('Compra Finalizada', 'commerce', `Total: $${sale.total} - Order ID: ${sale.id}`);
+    logActivity('🚀 Compra Finalizada', 'commerce', `Total: $${sale.total} - Order ID: ${sale.id}`);
     setSales(prev => [sale, ...prev]);
     setLastOrder(sale);
     if (user) {
@@ -82,40 +80,32 @@ const App: React.FC = () => {
     setView(AppView.SUCCESS);
   };
 
-  const addXP = (points: number) => {
-    logActivity('Ganancia de XP', 'gaming', `Puntos: ${points}`);
-    setUser(u => u ? { ...u, learningPoints: u.learningPoints + points } : null);
+  const addXP = async (points: number) => {
+    if (user) {
+      logActivity('⚡ XP Ganada', 'gaming', `Módulo completado: +${points} XP`);
+      const updatedTotal = await updateUserXP(user.email, points);
+      setUser(u => u ? { ...u, learningPoints: updatedTotal || u.learningPoints + points } : null);
+    }
   };
 
-  const handleLogin = (u: any) => {
+  const handleLogin = async (u: any) => {
     const isAdmin = u.email === 'admin@osart.cl';
     const fullUser = {
       ...u, 
       role: isAdmin ? 'admin' : 'user',
-      learningPoints: isAdmin ? 9999 : 750,
+      learningPoints: u.learningPoints || 0,
       orders: [],
       history: []
     } as UserType;
     
-    logActivity('Inicio de Sesión', 'auth', `Provider: ${u.provider || 'Email'}`);
+    logActivity('🔑 Inicio de Sesión', 'auth', `Provider: ${u.provider || 'Email'}`);
     setUser(fullUser); 
     setShowAuthModal(false); 
+    syncUserProfile(fullUser).catch(() => {});
     
     if (isAdmin) setView(AppView.ADMIN);
     else setView(AppView.HOME);
   };
-
-  if (view === AppView.ADMIN) {
-    return (
-      <AdminDashboard 
-        products={products} setProducts={setProducts} 
-        sales={sales} expenses={expenses} setExpenses={setExpenses}
-        storeConfig={storeConfig} setStoreConfig={setStoreConfig}
-        activityLogs={activityLogs}
-        onClose={() => setView(AppView.HOME)} 
-      />
-    );
-  }
 
   return (
     <div className="min-h-screen bg-white flex flex-col font-sans selection:bg-indigo-100 selection:text-indigo-900 overflow-x-hidden">
@@ -134,8 +124,8 @@ const App: React.FC = () => {
           {view === AppView.LOADING && (
             <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center justify-center py-48 text-center">
                <RefreshCw size={48} className="text-indigo-600 animate-spin mb-8" />
-               <h2 className="text-3xl font-black text-slate-900 tracking-tight">Sincronizando Protocolos</h2>
-               <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.2em] mt-2">Encriptación de canal activa</p>
+               <h2 className="text-3xl font-black text-slate-900 tracking-tight uppercase">Sincronizando Base de Datos</h2>
+               <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.2em] mt-2">Encriptación de canal Supabase activa</p>
             </motion.div>
           )}
 
@@ -150,24 +140,11 @@ const App: React.FC = () => {
           )}
 
           {view === AppView.CART && (
-            <Cart items={cart} onUpdateQuantity={(id, d) => setCart(prev => prev.map(i => i.id === id ? {...i, quantity: Math.max(1, i.quantity + d)} : i))} onRemove={(id) => setCart(prev => prev.filter(i => i.id !== id))} onCheckout={handleCheckoutStart} onBack={() => setView(AppView.CATALOG)} />
-          )}
-
-          {view === AppView.DELIVERY && (
-            <motion.div key="delivery" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-3xl mx-auto space-y-12 py-16">
-               <div className="space-y-4">
-                  <h2 className="text-4xl font-black text-slate-900 tracking-tighter">Nodo de Distribución</h2>
-                  <p className="text-slate-500 font-medium">Selecciona el protocolo de entrega para tus componentes de ingeniería.</p>
-               </div>
-               <div className="space-y-6">
-                  <DeliveryOption icon={Truck} title="Despacho Priority" price={4990} address="Entrega técnica en 24h a domicilio" onSelect={() => setView(AppView.CHECKOUT)} />
-                  <DeliveryOption icon={Package} title="Retiro en Hub Osart" price={0} address="Linares Centro - Protocolo de retiro inmediato" onSelect={() => setView(AppView.CHECKOUT)} />
-               </div>
-            </motion.div>
+            <Cart items={cart} onUpdateQuantity={(id, d) => setCart(prev => prev.map(i => i.id === id ? {...i, quantity: Math.max(1, i.quantity + d)} : i))} onRemove={(id) => setCart(prev => prev.filter(i => i.id !== id))} onCheckout={() => setView(AppView.CHECKOUT)} onBack={() => setView(AppView.CATALOG)} />
           )}
 
           {view === AppView.CHECKOUT && (
-            <Checkout items={cart} user={user} onComplete={handleOrderComplete} onBack={() => setView(AppView.DELIVERY)} />
+            <Checkout items={cart} user={user} onComplete={handleOrderComplete} onBack={() => setView(AppView.CART)} />
           )}
 
           {view === AppView.GAME && (
@@ -175,39 +152,35 @@ const App: React.FC = () => {
           )}
 
           {view === AppView.PROFILE && user && (
-            <Profile user={user} onLogout={() => { logActivity('Cierre de Sesión', 'auth', 'Logout Manual'); setUser(null); setView(AppView.HOME); }} />
+            <Profile user={user} onLogout={() => { logActivity('🔒 Cierre de Sesión', 'auth', 'Logout Manual'); setUser(null); setView(AppView.HOME); }} />
           )}
 
           {view === AppView.SUCCESS && (
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="max-w-4xl mx-auto text-center py-20 space-y-12">
-               <div className="relative inline-block">
-                  <div className="absolute inset-0 bg-green-500/20 blur-3xl animate-pulse"></div>
-                  <div className="w-32 h-32 bg-green-50 text-green-600 rounded-[3rem] flex items-center justify-center mx-auto shadow-2xl relative z-10">
-                    <CheckCircle size={64} />
-                  </div>
+               <div className="w-32 h-32 bg-green-50 text-green-600 rounded-[3rem] flex items-center justify-center mx-auto shadow-2xl">
+                 <CheckCircle size={64} />
                </div>
-               <div className="space-y-4">
-                  <h2 className="text-5xl font-black text-slate-900 tracking-tighter">Despliegue Exitoso</h2>
-                  <p className="text-slate-400 font-black uppercase text-xs tracking-[0.3em]">Orden #{lastOrder?.id} • Protocolo Validado</p>
-               </div>
-               <div className="bg-slate-50 p-10 rounded-[3.5rem] border border-slate-100 max-w-lg mx-auto space-y-6 text-left">
-                  <div className="flex justify-between items-center">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inversión Final</p>
-                    <p className="text-2xl font-black text-indigo-600">${lastOrder?.total.toLocaleString()}</p>
-                  </div>
-               </div>
-               <div className="flex flex-col sm:flex-row gap-6 justify-center">
-                 <button onClick={() => setView(AppView.HOME)} className="bg-indigo-600 text-white px-12 py-5 rounded-full font-black uppercase text-xs tracking-widest hover:bg-indigo-700 transition-all shadow-2xl shadow-indigo-100">Regresar al Catálogo</button>
-                 <button onClick={() => setView(AppView.PROFILE)} className="bg-white border border-slate-200 text-slate-900 px-12 py-5 rounded-full font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all">Ver mis Pedidos</button>
-               </div>
+               <h2 className="text-5xl font-black text-slate-900 tracking-tighter uppercase">Orden Registrada</h2>
+               <p className="text-slate-400 font-black uppercase text-xs tracking-[0.3em]">Orden #{lastOrder?.id} • Ledger Localizado</p>
+               <button onClick={() => setView(AppView.HOME)} className="bg-indigo-600 text-white px-12 py-5 rounded-full font-black uppercase text-xs tracking-widest shadow-2xl">Volver al Catálogo</button>
             </motion.div>
           )}
         </AnimatePresence>
       </main>
 
+      {view === AppView.ADMIN && (
+        <AdminDashboard 
+          products={products} setProducts={setProducts} 
+          sales={sales} expenses={expenses} setExpenses={setExpenses}
+          storeConfig={storeConfig} setStoreConfig={setStoreConfig}
+          activityLogs={activityLogs}
+          onClose={() => setView(AppView.HOME)} 
+        />
+      )}
+
       <Footer setView={setView} />
       <BottomNav currentView={view} setView={setView} cartCount={cart.reduce((a, b) => a + b.quantity, 0)} />
-      <AIAssistant context={JSON.stringify(products.map(p => ({ id: p.id, name: p.name, price: p.price, stock: p.stock, cat: p.category })))} />
+      <AIAssistant context={JSON.stringify(products.map(p => ({ id: p.id, name: p.name, price: p.price })))} />
       
       <AnimatePresence>
         {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} onLogin={handleLogin} />}
@@ -215,25 +188,5 @@ const App: React.FC = () => {
     </div>
   );
 };
-
-const DeliveryOption: React.FC<{ icon: any, title: string, price: number, address: string, onSelect: () => void }> = ({ icon: Icon, title, price, address, onSelect }) => (
-  <button onClick={onSelect} className="w-full bg-white p-8 rounded-[3rem] border-2 border-slate-100 flex items-center justify-between hover:border-indigo-600 hover:shadow-2xl hover:shadow-indigo-50 transition-all text-left group active:scale-[0.98]">
-    <div className="flex gap-6 items-center">
-       <div className="w-16 h-16 bg-slate-50 rounded-[1.5rem] flex items-center justify-center text-slate-400 group-hover:text-indigo-600 group-hover:bg-indigo-50 transition-colors">
-          <Icon size={32} />
-       </div>
-       <div>
-          <p className="font-black text-slate-900 text-lg group-hover:text-indigo-600 transition-colors">{title}</p>
-          <p className="text-sm text-slate-400 font-medium">{address}</p>
-       </div>
-    </div>
-    <div className="flex items-center gap-6">
-       <span className="font-black text-slate-950 text-xl">${price.toLocaleString()}</span>
-       <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:text-white group-hover:bg-indigo-600 transition-all shadow-inner">
-          <ChevronRight size={22} />
-       </div>
-    </div>
-  </button>
-);
 
 export default App;
