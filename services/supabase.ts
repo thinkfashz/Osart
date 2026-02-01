@@ -2,35 +2,34 @@
 import { createClient } from '@supabase/supabase-js';
 import { ActivityLog, User as UserType } from '../types';
 
-// Obtenemos las variables de entorno de Next.js
+/**
+ * Los valores de entorno de Next.js se inyectan en tiempo de ejecución.
+ * Durante el build o en entornos locales sin .env, estos valores serán undefined.
+ */
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 /**
- * Validación de URL para evitar el error 'supabaseUrl is required'.
- * Solo inicializa el cliente si la URL es una cadena válida que empieza con http.
+ * Función de validación robusta para asegurar que el cliente de Supabase
+ * solo se inicialice con parámetros válidos.
  */
-const isValidUrl = (url?: string) => {
-  if (!url || typeof url !== 'string') return false;
+const getSupabaseClient = () => {
+  if (!supabaseUrl || !supabaseKey || supabaseUrl === 'undefined' || supabaseKey === 'undefined') {
+    return null;
+  }
   try {
-    const parsed = new URL(url);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-  } catch {
-    return false;
+    // Validamos que sea una URL válida para evitar el crash del constructor
+    new URL(supabaseUrl);
+    return createClient(supabaseUrl, supabaseKey);
+  } catch (e) {
+    return null;
   }
 };
 
-/**
- * Cliente de Supabase exportado de forma segura.
- * Si las credenciales no son válidas, se exporta null y el resto de la app
- * maneja esta ausencia de forma silenciosa (Modo Simulación).
- */
-export const supabase = (isValidUrl(supabaseUrl) && supabaseKey) 
-  ? createClient(supabaseUrl as string, supabaseKey as string) 
-  : null;
+export const supabase = getSupabaseClient();
 
 if (!supabase) {
-  console.warn("[Osart Systems] Supabase no detectado o URL inválida. Iniciando en Modo Simulación Local.");
+  console.warn("[Osart Systems] Supabase no inicializado. El sistema operará en 'Modo Local' sin persistencia remota.");
 }
 
 export const syncUserProfile = async (user: UserType) => {
@@ -48,14 +47,14 @@ export const syncUserProfile = async (user: UserType) => {
     if (error) throw error;
     return data;
   } catch (e) {
-    console.error("Error sincronizando perfil:", e);
+    console.error("Error en sincronización de perfil:", e);
     return null;
   }
 };
 
 export const recordActivity = async (log: ActivityLog) => {
   if (!supabase) {
-    console.debug(`[Ledger Local] ${log.action}: ${log.details}`);
+    console.debug(`[Ledger Local] Actividad: ${log.action} - ${log.details}`);
     return;
   }
   try {
@@ -70,7 +69,7 @@ export const recordActivity = async (log: ActivityLog) => {
       }]);
     if (error) throw error;
   } catch (e) {
-    console.error("Error en Ledger remoto:", e);
+    console.error("Error en registro de Ledger:", e);
   }
 };
 
@@ -92,7 +91,7 @@ export const updateUserXP = async (email: string, pointsToAdd: number) => {
       
     return newXP;
   } catch (e) {
-    console.error("Error actualizando XP:", e);
+    console.error("Error al actualizar XP:", e);
     return null;
   }
 };
