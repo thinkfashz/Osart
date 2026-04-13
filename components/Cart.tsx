@@ -22,14 +22,14 @@ const Cart: React.FC<CartProps> = ({ items, onUpdateQuantity, onRemove, onChecko
           <ShoppingCart size={40} />
         </div>
         <div className="space-y-2">
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight">Your cart is empty</h2>
-          <p className="text-slate-400 font-medium">Add components to start your project.</p>
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight">Tu carrito está vacío</h2>
+          <p className="text-slate-400 font-medium">Agrega componentes para comenzar tu proyecto.</p>
         </div>
         <button 
           onClick={onBack} 
           className="bg-indigo-600 text-white px-10 py-4 rounded-full font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-100"
         >
-          Back to Shop
+          Volver a la Tienda
         </button>
       </div>
     );
@@ -38,8 +38,8 @@ const Cart: React.FC<CartProps> = ({ items, onUpdateQuantity, onRemove, onChecko
   return (
     <div className="max-w-6xl mx-auto space-y-12 py-10">
       <div className="flex items-center justify-between">
-        <h2 className="text-4xl font-black text-slate-950 tracking-tighter">Your Bag</h2>
-        <span className="text-sm font-black text-slate-400 uppercase tracking-widest">{items.length} Items</span>
+        <h2 className="text-4xl font-black text-slate-950 tracking-tighter">Tu Bolsa</h2>
+        <span className="text-sm font-black text-slate-400 uppercase tracking-widest">{items.length} Artículo{items.length !== 1 ? 's' : ''}</span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-16">
@@ -78,7 +78,7 @@ const Cart: React.FC<CartProps> = ({ items, onUpdateQuantity, onRemove, onChecko
                     onClick={() => onRemove(item.id)}
                     className="text-[10px] font-black uppercase text-red-500 hover:text-red-600 transition-colors tracking-widest"
                   >
-                    Remove
+                    Eliminar
                   </button>
                 </div>
               </div>
@@ -88,30 +88,30 @@ const Cart: React.FC<CartProps> = ({ items, onUpdateQuantity, onRemove, onChecko
 
         <div className="lg:col-span-1">
           <div className="bg-[#fcfcfd] p-10 rounded-[2.5rem] border border-slate-100 space-y-8">
-            <h3 className="text-2xl font-black text-slate-950 tracking-tight">Order Summary</h3>
+            <h3 className="text-2xl font-black text-slate-950 tracking-tight">Resumen del Pedido</h3>
             <div className="space-y-4">
               <div className="flex justify-between text-sm font-bold text-slate-500 uppercase tracking-widest">
                 <span>Subtotal</span>
-                <span className="text-slate-950">${subtotal.toLocaleString()}</span>
+                <span className="text-slate-950">${subtotal.toLocaleString('es-CL')}</span>
               </div>
               <div className="flex justify-between text-sm font-bold text-slate-500 uppercase tracking-widest">
-                <span>Shipping</span>
-                <span className="text-green-600 font-black">Free</span>
+                <span>Envío</span>
+                <span className="text-green-600 font-black">Gratis</span>
               </div>
               <div className="h-px bg-slate-100 my-8"></div>
               <div className="flex justify-between items-center">
                 <span className="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">Total</span>
-                <span className="text-3xl font-black text-slate-950">${subtotal.toLocaleString()}</span>
+                <span className="text-3xl font-black text-slate-950">${subtotal.toLocaleString('es-CL')}</span>
               </div>
             </div>
             <button 
               onClick={onCheckout}
               className="w-full bg-indigo-600 text-white py-5 rounded-full font-black text-xs uppercase tracking-widest hover:bg-indigo-700 active:scale-95 transition-all shadow-xl shadow-indigo-100"
             >
-              Checkout Now
+              Ir al Pago
             </button>
             <div className="pt-4 flex items-center justify-center gap-2 text-slate-400 text-[10px] font-black uppercase tracking-widest">
-              <ShieldCheck size={16} /> Verified Secure Checkout
+              <ShieldCheck size={16} /> Pago 100% Seguro
             </div>
           </div>
         </div>

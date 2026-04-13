@@ -1,0 +1,11 @@
+{
+  "app/page.tsx -> ../App": {
+    "id": 32,
+    "files": [
+      "static/chunks/95247769.64d6b66147b3f9e5.js",
+      "static/chunks/44530001.89129ba9ff7544ae.js",
+      "static/chunks/669.42ca1bd9c4fcfc97.js",
+      "static/chunks/32.f115ff1e6fdcf13a.js"
+    ]
+  }
+}
