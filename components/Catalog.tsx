@@ -15,7 +15,7 @@ interface CatalogProps {
 
 const Catalog: React.FC<CatalogProps> = ({ products, onProductSelect, onAddToCart, selectedCategory, setSelectedCategory }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const categories: Category[] = ['Todos', 'Microcontroladores', 'Seguridad', 'Herramientas', 'Robótica', 'Sensores'];
+  const categories: Category[] = ['Todos', 'Microcontroladores', 'Seguridad', 'Herramientas', 'Robótica', 'Sensores', 'Semiconductores', 'Pasivos'];
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
@@ -161,6 +161,11 @@ const Catalog: React.FC<CatalogProps> = ({ products, onProductSelect, onAddToCar
                          <TrendingDown size={10} strokeWidth={3} /> STOCK BAJO
                        </div>
                      )}
+                     {p.discountPercentage && p.discountPercentage > 0 && (
+                       <div className="bg-green-600 text-white text-[8px] font-black uppercase px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xl">
+                         <TrendingDown size={10} strokeWidth={3} /> -{p.discountPercentage}% OFERTA
+                       </div>
+                     )}
                      {p.price > 30000 && (
                        <div className="bg-slate-950 text-white text-[8px] font-black uppercase px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xl border border-white/10">
                          <ShieldCheck size={10} className="text-indigo-400" /> PRO GRADE
@@ -173,6 +178,7 @@ const Catalog: React.FC<CatalogProps> = ({ products, onProductSelect, onAddToCar
                     className="w-full h-full object-contain relative z-10 group-hover:scale-110 transition-transform duration-1000 ease-out" 
                     alt={p.name} 
                     layoutId={`product-image-${p.id}`}
+                    loading="lazy"
                    />
 
                    {/* Quick Actions Overlay */}
@@ -206,7 +212,7 @@ const Catalog: React.FC<CatalogProps> = ({ products, onProductSelect, onAddToCar
                   
                   <div className="flex items-center justify-between pt-6 border-t border-slate-50">
                     <div className="flex flex-col">
-                       <span className="text-2xl font-black text-slate-950">${p.price.toLocaleString()}</span>
+                       <span className="text-2xl font-black text-slate-950">${p.price.toLocaleString('es-CL')}</span>
                        <span className="text-[9px] font-black text-green-600 uppercase tracking-widest mt-1">Despacho en 24h</span>
                     </div>
                     <div className="flex -space-x-3">

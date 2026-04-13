@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Star, ShoppingCart, ArrowLeft, Cpu, ShieldCheck, 
   Truck, Heart, Zap, Clock, Users, ChevronRight, 
-  Info, Share2, TrendingUp, AlertCircle, Bookmark, PackageCheck
+  Info, Share2, TrendingUp, AlertCircle, Bookmark, PackageCheck, MessageCircle
 } from 'lucide-react';
 import { Product } from '../types';
 
@@ -22,7 +22,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onAddToCart, onB
   // Datos simulados de alta conversión
   const discountPercentage = 35;
   const originalPrice = Math.floor(product.price / (1 - discountPercentage / 100));
-  const activeViewers = Math.floor(Math.random() * 20) + 5;
+  const [activeViewers] = useState(() => Math.floor(Math.random() * 20) + 5);
   const stockPercentage = (product.stock / 50) * 100;
 
   useEffect(() => {
@@ -109,7 +109,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onAddToCart, onB
             <div className="hidden lg:grid grid-cols-4 gap-6">
               {[1, 2, 3, 4].map((i) => (
                 <div key={i} className={`aspect-square rounded-[2rem] bg-[#f8f9fb] border-2 transition-all cursor-pointer hover:border-indigo-200 flex items-center justify-center p-4 ${i === 1 ? 'border-indigo-600' : 'border-transparent opacity-60'}`}>
-                   <img src={product.image} className="w-full h-full object-contain opacity-40" alt="thumb" />
+                   <img src={product.image} className="w-full h-full object-contain opacity-40" alt="thumb" loading="lazy" />
                 </div>
               ))}
             </div>
@@ -149,8 +149,8 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onAddToCart, onB
                 <div className="space-y-1">
                   <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Oferta Especial Limitada</p>
                   <div className="flex items-baseline gap-3">
-                    <span className="text-5xl lg:text-6xl font-black tracking-tighter">${product.price.toLocaleString()}</span>
-                    <span className="text-xl text-indigo-300/50 line-through font-bold">${originalPrice.toLocaleString()}</span>
+                    <span className="text-5xl lg:text-6xl font-black tracking-tighter">${product.price.toLocaleString('es-CL')}</span>
+                    <span className="text-xl text-indigo-300/50 line-through font-bold">${originalPrice.toLocaleString('es-CL')}</span>
                   </div>
                 </div>
                 
@@ -281,7 +281,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onAddToCart, onB
               <div className="flex-grow pl-6 py-2">
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Total Inversión</p>
                 <div className="flex items-center gap-2 mt-1">
-                   <p className="text-2xl font-black text-indigo-950">${product.price.toLocaleString()}</p>
+                   <p className="text-2xl font-black text-indigo-950">${product.price.toLocaleString('es-CL')}</p>
                    {discountPercentage > 0 && <span className="text-[10px] font-black text-green-600 bg-green-50 px-2 py-0.5 rounded-lg">-{discountPercentage}%</span>}
                 </div>
               </div>
@@ -294,6 +294,15 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onAddToCart, onB
                 Añadir al Carrito
                 <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
               </button>
+               <a
+                 href={`https://wa.me/56987654321?text=${encodeURIComponent(`Hola, me interesa: ${product.name} ($${product.price.toLocaleString('es-CL')}). ¿Disponibilidad?`)}`}
+                 target="_blank"
+                 rel="noopener noreferrer"
+                 className="flex-none bg-green-500 text-white p-5 rounded-full shadow-2xl shadow-green-200 hover:bg-green-600 transition-all active:scale-95"
+                 aria-label="Consultar por WhatsApp"
+               >
+                 <MessageCircle size={20} />
+               </a>
            </motion.div>
         </div>
       </div>

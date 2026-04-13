@@ -80,7 +80,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, onLogin }) => {
             </div>
             <div className="relative group">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-600 transition-colors" size={20} />
-              <input required type="password" placeholder="Clave de Encriptación" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-indigo-500 transition-all font-bold text-sm" />
+              <input required type="password" placeholder="Clave de Encriptación" className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-indigo-500 transition-all font-bold text-sm" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
             </div>
             <button className="w-full bg-slate-950 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-xl shadow-slate-200 flex items-center justify-center gap-3 mt-6 group">
               Ejecutar Acceso <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
